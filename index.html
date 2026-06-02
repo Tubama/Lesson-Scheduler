@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lesson Scheduler</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav">
+        <a class="brand" href="#top" aria-label="Lesson Scheduler home">
+          <span class="brand-mark">LS</span>
+          <span>
+            <strong>Lesson Scheduler</strong>
+            <small>Studio enrollment</small>
+          </span>
+        </a>
+        <div class="nav-actions" aria-label="Primary navigation">
+          <a href="#register">Register</a>
+          <a href="#waitlist">Waitlist</a>
+          <a href="#admin">Admin Preview</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">School year and summer lesson placement</p>
+          <h1>Choose a recurring music lesson time, then wait for teacher approval.</h1>
+          <p>
+            Returning families request their preferred studio time first. New students join
+            the waitlist and are invited into a 4-lesson trial only when a regular spot opens.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#register">Start registration</a>
+            <a class="button secondary" href="#admin">Review admin flow</a>
+          </div>
+        </div>
+        <div class="hero-panel" aria-label="Schedule snapshot">
+          <div class="panel-header">
+            <span>2026-2027 School Year</span>
+            <strong>Registration: returning families</strong>
+          </div>
+          <div class="stat-grid">
+            <div>
+              <strong id="openSlotsCount">0</strong>
+              <span>open slots</span>
+            </div>
+            <div>
+              <strong id="pendingCount">0</strong>
+              <span>pending</span>
+            </div>
+            <div>
+              <strong>2</strong>
+              <span>locations</span>
+            </div>
+          </div>
+          <ol class="flow-list">
+            <li>Parents submit first, second, and third choices.</li>
+            <li>Requested times are held until reviewed.</li>
+            <li>Approved placements sync to Google Calendar.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="register">
+        <div class="section-heading">
+          <p class="eyebrow">Parent registration</p>
+          <h2>Request a recurring lesson time</h2>
+          <p>
+            This prototype shows exact available openings by location while preserving the
+            flexibility to rearrange requests before the final schedule is approved.
+          </p>
+        </div>
+
+        <div class="workspace-grid">
+          <form class="scheduler-card" id="registrationForm">
+            <div class="field-row">
+              <label>
+                Schedule
+                <select id="termSelect" name="term">
+                  <option value="school">School year 2026-2027</option>
+                  <option value="summer">Summer lesson block</option>
+                </select>
+              </label>
+              <label>
+                Family type
+                <select id="familyType" name="familyType">
+                  <option value="returning">Returning student</option>
+                  <option value="new">New student</option>
+                </select>
+              </label>
+            </div>
+
+            <label id="accessCodeField">
+              Returning family access code
+              <input name="accessCode" placeholder="Example: FALL2026" />
+            </label>
+
+            <div class="field-row">
+              <label>
+                Parent name
+                <input required name="parentName" placeholder="Parent or guardian" />
+              </label>
+              <label>
+                Email
+                <input required type="email" name="email" placeholder="name@example.com" />
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label>
+                Student name
+                <input required name="studentName" placeholder="Student name" />
+              </label>
+              <label>
+                Lesson length
+                <select id="lessonLength" name="lessonLength">
+                  <option value="30">30 minutes - $42</option>
+                  <option value="45">45 minutes - $62</option>
+                  <option value="60">60 minutes - $82</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Preferred location
+              <select id="locationSelect" name="location">
+                <option value="Vacaville">Vacaville Studio</option>
+                <option value="Davis">Davis Location</option>
+              </select>
+            </label>
+
+            <fieldset>
+              <legend>Preferred recurring times</legend>
+              <div class="choice-grid">
+                <label>
+                  First choice
+                  <select id="firstChoice" name="firstChoice"></select>
+                </label>
+                <label>
+                  Second choice
+                  <select id="secondChoice" name="secondChoice"></select>
+                </label>
+                <label>
+                  Third choice
+                  <select id="thirdChoice" name="thirdChoice"></select>
+                </label>
+              </div>
+            </fieldset>
+
+            <label>
+              Notes
+              <textarea name="notes" rows="4" placeholder="Anything helpful about siblings, schedule constraints, or summer availability"></textarea>
+            </label>
+
+            <div class="form-footer">
+              <p id="registrationHint">Requests are held as pending until teacher approval.</p>
+              <button class="button primary" type="submit">Submit request</button>
+            </div>
+          </form>
+
+          <aside class="availability-card">
+            <div class="card-heading">
+              <p class="eyebrow">Live preview</p>
+              <h3 id="availabilityTitle">Vacaville openings</h3>
+            </div>
+            <div class="slot-list" id="slotList"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section muted" id="waitlist">
+        <div class="section-heading">
+          <p class="eyebrow">New students</p>
+          <h2>Waitlist and 4-lesson trial process</h2>
+          <p>
+            New students do not see the regular schedule. They join the waitlist first.
+            When a student drops, the open weekly time can be offered as a 4-lesson trial.
+          </p>
+        </div>
+        <div class="process-grid">
+          <article>
+            <span>1</span>
+            <h3>Join waitlist</h3>
+            <p>Families share location, day, time, and lesson-length preferences.</p>
+          </article>
+          <article>
+            <span>2</span>
+            <h3>Spot opens</h3>
+            <p>You invite one waitlisted family when a weekly time becomes available.</p>
+          </article>
+          <article>
+            <span>3</span>
+            <h3>Trial block</h3>
+            <p>The family takes that same weekly time for 4 lessons.</p>
+          </article>
+          <article>
+            <span>4</span>
+            <h3>Continue or release</h3>
+            <p>You decide whether the student keeps the time or the slot reopens.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="admin">
+        <div class="section-heading">
+          <p class="eyebrow">Admin preview</p>
+          <h2>Review requests before the schedule is final</h2>
+          <p>
+            This is the teacher-side workflow: approve, move, or reject pending requests,
+            then sync approved recurring lessons to Google Calendar.
+          </p>
+        </div>
+        <div class="admin-layout">
+          <div class="admin-panel">
+            <div class="admin-toolbar">
+              <button class="tab-button active" data-admin-filter="pending">Pending</button>
+              <button class="tab-button" data-admin-filter="approved">Approved</button>
+              <button class="tab-button" data-admin-filter="trial">Trials</button>
+              <button class="tab-button" data-admin-filter="waitlist">Waitlist</button>
+            </div>
+            <div id="adminList" class="admin-list"></div>
+          </div>
+          <aside class="rules-card">
+            <h3>Schedule rules</h3>
+            <dl>
+              <div>
+                <dt>Vacaville</dt>
+                <dd>Monday, Wednesday, Friday - 3:00 PM to 8:00 PM</dd>
+              </div>
+              <div>
+                <dt>Davis</dt>
+                <dd>Tuesday 3:00 PM to 8:45 PM, Thursday 2:45 PM to 8:00 PM, Saturday 9:00 AM to 2:45 PM</dd>
+              </div>
+              <div>
+                <dt>Approval</dt>
+                <dd>Every request stays pending until reviewed.</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Prototype for yearly and summer music lesson placement.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
