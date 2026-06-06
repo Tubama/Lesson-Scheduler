@@ -673,6 +673,13 @@ textarea {
   padding-bottom: 22px;
 }
 
+.schedule-summary-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
 .approved-groups,
 .approved-row-list {
   display: grid;

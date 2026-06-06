@@ -105,6 +105,10 @@ function normalizeAccessCode(code) {
   return code.trim().toUpperCase();
 }
 
+function csvValue(value) {
+  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+}
+
 function overlaps(slot, hold) {
   return (
     hold.active &&
@@ -284,8 +288,8 @@ export default function Home() {
       }));
   }, [adminFilter, registrationRequests, waitlistEntries]);
 
-  const approvedScheduleGroups = useMemo(() => {
-    const approvedRows = registrationRequests
+  const approvedScheduleRows = useMemo(() => {
+    return registrationRequests
       .filter((request) => request.status === "approved" && request.first_choice)
       .map((request) => {
         const parsedChoice = parseSlotLabel(request.first_choice);
@@ -301,7 +305,11 @@ export default function Home() {
           studentName: request.student_name,
           parentName: request.parent_name,
           email: request.email,
-          lessonLength: request.lesson_length
+          lessonLength: request.lesson_length,
+          firstChoice: request.first_choice,
+          secondChoice: request.second_choice,
+          thirdChoice: request.third_choice,
+          notes: request.notes
         };
       })
       .filter(Boolean)
@@ -314,8 +322,10 @@ export default function Home() {
         if (dayCompare) return dayCompare;
         return a.startMinutes - b.startMinutes;
       });
+  }, [registrationRequests]);
 
-    return approvedRows.reduce((groups, row) => {
+  const approvedScheduleGroups = useMemo(() => {
+    return approvedScheduleRows.reduce((groups, row) => {
       const title = `${row.term === "summer" ? "Summer" : "School year"} · ${row.location} · ${row.day}`;
       const existingGroup = groups.find((group) => group.title === title);
 
@@ -326,7 +336,7 @@ export default function Home() {
 
       return [...groups, { title, rows: [row] }];
     }, []);
-  }, [registrationRequests]);
+  }, [approvedScheduleRows]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -567,6 +577,54 @@ export default function Home() {
 
     setAdminMessage("Registration settings saved.");
     setAdminLoading(false);
+  }
+
+  function downloadApprovedSchedule() {
+    if (!approvedScheduleRows.length) {
+      setAdminMessage("There are no approved placements to export yet.");
+      return;
+    }
+
+    const headers = [
+      "Schedule",
+      "Location",
+      "Day",
+      "Start time",
+      "Student",
+      "Parent",
+      "Email",
+      "Lesson length",
+      "First choice",
+      "Second choice",
+      "Third choice",
+      "Notes"
+    ];
+    const rows = approvedScheduleRows.map((row) => [
+      row.term === "summer" ? "Summer" : "School year",
+      row.location,
+      row.day,
+      row.time,
+      row.studentName,
+      row.parentName,
+      row.email,
+      `${row.lessonLength} minutes`,
+      row.firstChoice,
+      row.secondChoice,
+      row.thirdChoice,
+      row.notes
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map(csvValue).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `approved-schedule-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setAdminMessage("Approved schedule CSV downloaded.");
   }
 
   async function addScheduleRule(event) {
@@ -1226,10 +1284,20 @@ export default function Home() {
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
                   <section className="approved-schedule">
-                    <div className="section-heading compact-heading">
-                      <p className="eyebrow">Approved schedule</p>
-                      <h3>Final recurring placements</h3>
-                      <p>Approved requests appear here grouped by schedule, location, day, and start time.</p>
+                    <div className="schedule-summary-heading">
+                      <div className="section-heading compact-heading">
+                        <p className="eyebrow">Approved schedule</p>
+                        <h3>Final recurring placements</h3>
+                        <p>Approved requests appear here grouped by schedule, location, day, and start time.</p>
+                      </div>
+                      <button
+                        className="button secondary"
+                        disabled={!approvedScheduleRows.length}
+                        onClick={downloadApprovedSchedule}
+                        type="button"
+                      >
+                        Download CSV
+                      </button>
                     </div>
                     {approvedScheduleGroups.length ? (
                       <div className="approved-groups">
