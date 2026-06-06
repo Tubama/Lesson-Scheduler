@@ -424,14 +424,6 @@ export default function Home() {
       return;
     }
 
-    if (!isNewFamily && !form.firstChoice) {
-      setSubmitState({
-        status: "error",
-        message: "Please choose at least a first-choice lesson time."
-      });
-      return;
-    }
-
     const { error } = await supabase.auth.signInWithPassword({
       email: adminLogin.email,
       password: adminLogin.password
@@ -505,10 +497,16 @@ export default function Home() {
 
     if (item.table === "registration_requests") {
       const holdActive = ["pending", "approved"].includes(nextStatus);
-      await supabase
+      const { error: holdError } = await supabase
         .from("schedule_holds")
         .update({ status: nextStatus, active: holdActive })
         .eq("request_id", item.id);
+
+      if (holdError) {
+        setAdminMessage(`Request status changed, but the schedule hold could not be updated: ${holdError.message}`);
+        setAdminLoading(false);
+        return;
+      }
     }
 
     await loadAdminData();
@@ -523,6 +521,14 @@ export default function Home() {
       setSubmitState({
         status: "error",
         message: "Supabase is not configured yet. Add the project URL and publishable key to .env.local."
+      });
+      return;
+    }
+
+    if (!isNewFamily && !form.firstChoice) {
+      setSubmitState({
+        status: "error",
+        message: "Please choose at least a first-choice lesson time."
       });
       return;
     }
