@@ -489,7 +489,7 @@ export default function Home() {
             <div className="stat-grid">
               <div>
                 <strong>{openSlotsCount}</strong>
-                <span>open slots</span>
+                <span>open starts</span>
               </div>
               <div>
                 <strong>{pendingCount}</strong>
@@ -501,8 +501,8 @@ export default function Home() {
               </div>
             </div>
             <ol className="flow-list">
-              <li>Parents submit first, second, and third choices.</li>
-              <li>Requested times are held until reviewed.</li>
+              <li>Parents submit first, second, and third start-time choices.</li>
+              <li>Start-time options adjust to the selected lesson length.</li>
               <li>Approved placements sync to Google Calendar.</li>
             </ol>
           </div>
@@ -513,7 +513,7 @@ export default function Home() {
             <p className="eyebrow">Parent registration</p>
             <h2>Request a recurring lesson time</h2>
             <p>
-              This prototype shows exact available openings by location while preserving the
+              This form shows start-time options by location while preserving the
               flexibility to rearrange requests before the final schedule is approved.
             </p>
           </div>
@@ -626,7 +626,7 @@ export default function Home() {
             <aside className="availability-card">
               <div className="card-heading">
                 <p className="eyebrow">Live preview</p>
-                <h3>{form.location} openings</h3>
+                <h3>{form.location} {form.lessonLength}-minute starts</h3>
               </div>
               <div className="slot-list">
                 {filteredSlots.length ? (
@@ -634,13 +634,13 @@ export default function Home() {
                     <div className={`slot ${slot.status === "held" ? "held" : ""}`} key={slotLabel(slot)}>
                       <strong>{slotLabel(slot)}</strong>
                       <span className="slot-meta">
-                        {slot.status === "held" ? "Held pending approval" : "Available to request"}
+                        Available to request
                       </span>
                     </div>
                   ))
                 ) : (
                   <div className="slot">
-                    <strong>No exact matches</strong>
+                    <strong>No start times available</strong>
                     <span className="slot-meta">Try a different lesson length or join the waitlist.</span>
                   </div>
                 )}
@@ -760,8 +760,8 @@ export default function Home() {
                   <div className="schedule-builder">
                     <div className="section-heading compact-heading">
                       <p className="eyebrow">Schedule builder</p>
-                      <h3>Add teaching availability</h3>
-                      <p>Create recurring weekly teaching blocks. Parent time choices are generated from these rules.</p>
+                      <h3>Add teaching block</h3>
+                      <p>Create recurring weekly teaching blocks. Parent start times are generated from the block and selected lesson length.</p>
                     </div>
                     <form className="schedule-rule-form" onSubmit={addScheduleRule}>
                       <label>
@@ -802,14 +802,14 @@ export default function Home() {
               )}
             </div>
             <aside className="rules-card">
-              <h3>Schedule rules</h3>
+              <h3>Teaching blocks</h3>
               <div className="rules-list">
                 {sortRules(scheduleRules).map((rule) => (
                   <article className="rule-item" key={rule.id}>
                     <div>
-                      <strong>{rule.location}</strong>
-                      <span>{rule.term === "school" ? "School year" : "Summer"} · {rule.day_of_week}</span>
-                      <small>{formatTime(minutesFromTime(rule.start_time))} to {formatTime(minutesFromTime(rule.end_time))}</small>
+                        <strong>{rule.location}</strong>
+                        <span>{rule.term === "school" ? "School year" : "Summer"} · {rule.day_of_week}</span>
+                        <small>{formatTime(minutesFromTime(rule.start_time))} to {formatTime(minutesFromTime(rule.end_time))}</small>
                     </div>
                     {adminSession && !String(rule.id).startsWith("default-") && (
                       <button className="text-button" type="button" onClick={() => deleteScheduleRule(rule.id)}>Remove</button>

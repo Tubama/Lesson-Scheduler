@@ -14,6 +14,14 @@ A prototype web app for yearly and summer music lesson placement.
 - Admin sign-in for reading and updating real Supabase requests
 - Admin schedule builder for recurring weekly teaching blocks
 
+## Scheduling model
+
+The app stores teaching blocks, not fixed lesson slots. Parent start-time options are generated from the selected lesson length:
+
+- 30-minute lessons generate 30-minute start intervals
+- 45-minute lessons generate 45-minute start intervals
+- 60-minute lessons generate hourly start intervals
+
 ## Run locally
 
 Install dependencies:
