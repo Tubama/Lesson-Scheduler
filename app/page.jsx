@@ -291,7 +291,7 @@ export default function Home() {
 
     const { error } = await supabase
       .from("schedule_rules")
-      .update({ active: false })
+      .delete()
       .eq("id", ruleId);
 
     if (error) {

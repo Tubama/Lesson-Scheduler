@@ -98,6 +98,19 @@ for select
 to anon, authenticated
 using (active = true);
 
+drop policy if exists "Studio admins can read all schedule rules" on public.schedule_rules;
+create policy "Studio admins can read all schedule rules"
+on public.schedule_rules
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
+
 drop policy if exists "Studio admins can create schedule rules" on public.schedule_rules;
 create policy "Studio admins can create schedule rules"
 on public.schedule_rules
@@ -124,6 +137,19 @@ using (
   )
 )
 with check (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
+
+drop policy if exists "Studio admins can delete schedule rules" on public.schedule_rules;
+create policy "Studio admins can delete schedule rules"
+on public.schedule_rules
+for delete
+to authenticated
+using (
   exists (
     select 1
     from public.studio_admins
