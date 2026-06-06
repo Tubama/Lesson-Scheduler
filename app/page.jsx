@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
 const schedules = {
@@ -40,39 +40,6 @@ const schedules = {
   }
 };
 
-const adminItems = [
-  {
-    status: "pending",
-    name: "Maya Chen",
-    details: "Returning student requesting Wednesday 4:15 PM in Vacaville, 45 minutes.",
-    choices: "Alternates: Friday 5:00 PM, Monday 3:00 PM"
-  },
-  {
-    status: "pending",
-    name: "Eli Thompson",
-    details: "Returning student requesting Tuesday 3:00 PM in Davis, 45 minutes.",
-    choices: "Alternates: Thursday 6:30 PM, Saturday 9:00 AM"
-  },
-  {
-    status: "approved",
-    name: "Sofia Garcia",
-    details: "Approved for Monday 3:30 PM in Vacaville, 45 minutes.",
-    choices: "Ready to sync as a weekly Google Calendar event."
-  },
-  {
-    status: "trial",
-    name: "Noah Patel",
-    details: "4-lesson trial offered for Tuesday 5:15 PM in Davis.",
-    choices: "Trial lesson 2 of 4."
-  },
-  {
-    status: "waitlist",
-    name: "Ava Williams",
-    details: "New student waitlisted for Davis, 30 or 45 minutes.",
-    choices: "Available Tuesdays after 4:30 PM and Saturdays before noon."
-  }
-];
-
 const initialForm = {
   term: "school",
   familyType: "returning",
@@ -88,6 +55,11 @@ const initialForm = {
   notes: ""
 };
 
+const initialAdminLogin = {
+  email: "",
+  password: ""
+};
+
 function slotLabel(slot) {
   return `${slot.day} at ${slot.start} (${slot.length} minutes)`;
 }
@@ -100,6 +72,12 @@ export default function Home() {
   const [form, setForm] = useState(initialForm);
   const [adminFilter, setAdminFilter] = useState("pending");
   const [submitState, setSubmitState] = useState({ status: "idle", message: "" });
+  const [adminLogin, setAdminLogin] = useState(initialAdminLogin);
+  const [adminSession, setAdminSession] = useState(null);
+  const [adminMessage, setAdminMessage] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [registrationRequests, setRegistrationRequests] = useState([]);
+  const [waitlistEntries, setWaitlistEntries] = useState([]);
 
   const filteredSlots = useMemo(() => {
     const slots = schedules[form.term].locations[form.location] || [];
@@ -111,7 +89,86 @@ export default function Home() {
   const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
   const pendingCount = allSlots.filter((slot) => slot.status === "held").length;
   const isNewFamily = form.familyType === "new";
-  const adminCards = adminItems.filter((item) => item.status === adminFilter);
+  const adminCards = useMemo(() => {
+    if (adminFilter === "waitlist") {
+      return [
+        ...registrationRequests
+          .filter((item) => item.status === "waitlist")
+          .map((item) => ({
+            id: item.id,
+            table: "registration_requests",
+            status: item.status,
+            name: item.student_name,
+            details: `${item.parent_name} was moved from registration requests to the waitlist.`,
+            choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
+            email: item.email,
+            parentName: item.parent_name,
+            notes: item.notes,
+            createdAt: item.created_at
+          })),
+        ...waitlistEntries.map((item) => ({
+          id: item.id,
+          table: "waitlist_entries",
+          status: item.status,
+          name: item.student_name,
+          details: `${item.parent_name} requested the waitlist for ${item.location}, ${item.lesson_length} minutes.`,
+          choices: item.notes || "No notes provided.",
+          email: item.email,
+          createdAt: item.created_at
+        }))
+      ];
+    }
+
+    if (adminFilter === "trial") {
+      return waitlistEntries
+        .filter((item) => item.status === "trial")
+        .map((item) => ({
+          id: item.id,
+          table: "waitlist_entries",
+          status: item.status,
+          name: item.student_name,
+          details: `${item.parent_name} is in a 4-lesson trial for ${item.location}, ${item.lesson_length} minutes.`,
+          choices: item.notes || "No notes provided.",
+          email: item.email,
+          createdAt: item.created_at
+        }));
+    }
+
+    return registrationRequests
+      .filter((item) => item.status === adminFilter)
+      .map((item) => ({
+        id: item.id,
+        table: "registration_requests",
+        status: item.status,
+        name: item.student_name,
+        details: `${item.family_type === "returning" ? "Returning" : "New"} student requesting ${item.location}, ${item.lesson_length} minutes.`,
+        choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
+        email: item.email,
+        parentName: item.parent_name,
+        notes: item.notes,
+        createdAt: item.created_at
+      }));
+  }, [adminFilter, registrationRequests, waitlistEntries]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      setAdminSession(data.session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAdminSession(session);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (adminSession) {
+      loadAdminData();
+    }
+  }, [adminSession]);
 
   function updateForm(event) {
     const { name, value } = event.target;
@@ -124,6 +181,95 @@ export default function Home() {
       }
       return next;
     });
+  }
+
+  function updateAdminLogin(event) {
+    const { name, value } = event.target;
+    setAdminLogin((current) => ({ ...current, [name]: value }));
+  }
+
+  async function signInAdmin(event) {
+    event.preventDefault();
+    setAdminLoading(true);
+    setAdminMessage("Signing in...");
+
+    if (!isSupabaseConfigured || !supabase) {
+      setAdminMessage("Supabase is not configured yet.");
+      setAdminLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: adminLogin.email,
+      password: adminLogin.password
+    });
+
+    if (error) {
+      setAdminMessage(`Could not sign in: ${error.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    setAdminLogin(initialAdminLogin);
+    setAdminMessage("Signed in.");
+    setAdminLoading(false);
+  }
+
+  async function signOutAdmin() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setRegistrationRequests([]);
+    setWaitlistEntries([]);
+    setAdminMessage("Signed out.");
+  }
+
+  async function loadAdminData() {
+    if (!supabase) return;
+    setAdminLoading(true);
+    setAdminMessage("Loading requests...");
+
+    const [registrationsResult, waitlistResult] = await Promise.all([
+      supabase
+        .from("registration_requests")
+        .select("id, created_at, term, family_type, parent_name, email, student_name, lesson_length, location, first_choice, second_choice, third_choice, notes, status")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("waitlist_entries")
+        .select("id, created_at, parent_name, email, student_name, lesson_length, location, notes, status")
+        .order("created_at", { ascending: false })
+    ]);
+
+    if (registrationsResult.error || waitlistResult.error) {
+      const errorMessage = registrationsResult.error?.message || waitlistResult.error?.message;
+      setAdminMessage(`Could not load admin data: ${errorMessage}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    setRegistrationRequests(registrationsResult.data || []);
+    setWaitlistEntries(waitlistResult.data || []);
+    setAdminMessage("Requests loaded.");
+    setAdminLoading(false);
+  }
+
+  async function updateRequestStatus(item, nextStatus) {
+    if (!supabase) return;
+    setAdminLoading(true);
+    setAdminMessage("Updating request...");
+
+    const { error } = await supabase
+      .from(item.table)
+      .update({ status: nextStatus })
+      .eq("id", item.id);
+
+    if (error) {
+      setAdminMessage(`Could not update request: ${error.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    await loadAdminData();
+    setAdminMessage("Request updated.");
   }
 
   async function submitRequest(event) {
@@ -412,38 +558,89 @@ export default function Home() {
 
         <section className="section" id="admin">
           <div className="section-heading">
-            <p className="eyebrow">Admin preview</p>
+            <p className="eyebrow">Admin dashboard</p>
             <h2>Review requests before the schedule is final</h2>
             <p>
-              This is the teacher-side workflow: approve, move, or reject pending requests,
-              then sync approved recurring lessons to Google Calendar.
+              Sign in to view real registration and waitlist requests saved in Supabase.
             </p>
           </div>
           <div className="admin-layout">
             <div className="admin-panel">
-              <div className="admin-toolbar">
-                {["pending", "approved", "trial", "waitlist"].map((status) => (
-                  <button
-                    className={`tab-button ${adminFilter === status ? "active" : ""}`}
-                    key={status}
-                    onClick={() => setAdminFilter(status)}
-                    type="button"
-                  >
-                    {status === "trial" ? "Trials" : status[0].toUpperCase() + status.slice(1)}
+              {!adminSession ? (
+                <form className="admin-login" onSubmit={signInAdmin}>
+                  <label>
+                    Admin email
+                    <input required type="email" name="email" value={adminLogin.email} onChange={updateAdminLogin} placeholder="you@example.com" />
+                  </label>
+                  <label>
+                    Password
+                    <input required type="password" name="password" value={adminLogin.password} onChange={updateAdminLogin} placeholder="Supabase password" />
+                  </label>
+                  <button className="button primary" type="submit" disabled={adminLoading}>
+                    {adminLoading ? "Signing in..." : "Sign in"}
                   </button>
-                ))}
-              </div>
-              <div className="admin-list">
-                {adminCards.map((item) => (
-                  <article className="admin-card" key={`${item.status}-${item.name}`}>
-                    <span className={`status-pill status-${item.status}`}>{item.status}</span>
-                    <h3>{item.name}</h3>
-                    <p>{item.details}</p>
-                    <p>{item.choices}</p>
-                    <button className="button secondary" type="button">Review</button>
-                  </article>
-                ))}
-              </div>
+                  {adminMessage && <p className="admin-message">{adminMessage}</p>}
+                </form>
+              ) : (
+                <>
+                  <div className="admin-session-bar">
+                    <span>Signed in as {adminSession.user.email}</span>
+                    <div>
+                      <button className="button secondary" type="button" onClick={loadAdminData} disabled={adminLoading}>Refresh</button>
+                      <button className="button secondary" type="button" onClick={signOutAdmin}>Sign out</button>
+                    </div>
+                  </div>
+                  <div className="admin-toolbar">
+                    {["pending", "approved", "trial", "waitlist"].map((status) => (
+                      <button
+                        className={`tab-button ${adminFilter === status ? "active" : ""}`}
+                        key={status}
+                        onClick={() => setAdminFilter(status)}
+                        type="button"
+                      >
+                        {status === "trial" ? "Trials" : status[0].toUpperCase() + status.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  {adminMessage && <p className="admin-message">{adminMessage}</p>}
+                  <div className="admin-list">
+                    {adminCards.length ? (
+                      adminCards.map((item) => (
+                        <article className="admin-card" key={`${item.table}-${item.id}`}>
+                          <span className={`status-pill status-${item.status}`}>{item.status}</span>
+                          <h3>{item.name}</h3>
+                          <p>{item.details}</p>
+                          <p>{item.choices}</p>
+                          {item.parentName && <p>Parent: {item.parentName}</p>}
+                          <p>Email: {item.email}</p>
+                          {item.notes && <p>Notes: {item.notes}</p>}
+                          <div className="admin-card-actions">
+                            {item.table === "registration_requests" && item.status === "pending" && (
+                              <>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "approved")}>Approve</button>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "rejected")}>Reject</button>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "waitlist")}>Waitlist</button>
+                              </>
+                            )}
+                            {item.table === "waitlist_entries" && (
+                              <>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "invited")}>Invite</button>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "trial")}>Start trial</button>
+                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "closed")}>Close</button>
+                              </>
+                            )}
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="empty-state">
+                        <strong>No {adminFilter} requests yet.</strong>
+                        <span>New submissions will appear here after parents use the registration form.</span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <aside className="rules-card">
               <h3>Schedule rules</h3>

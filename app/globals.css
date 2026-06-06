@@ -432,6 +432,54 @@ textarea {
   margin-bottom: 18px;
 }
 
+.admin-login {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-session-bar {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+}
+
+.admin-session-bar span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-session-bar div,
+.admin-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-message,
+.empty-state {
+  background: var(--soft-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+}
+
+.empty-state {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.empty-state strong {
+  color: var(--ink);
+}
+
 .tab-button {
   background: var(--cream);
   border: 1px solid var(--line);
@@ -489,6 +537,13 @@ textarea {
 }
 
 .status-waitlist {
+  background: #f6eee8;
+  color: #9a5f3a;
+}
+
+.status-waiting,
+.status-invited,
+.status-closed {
   background: #f6eee8;
   color: #9a5f3a;
 }
