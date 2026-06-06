@@ -480,6 +480,65 @@ textarea {
   color: var(--ink);
 }
 
+.compact-heading {
+  margin-bottom: 16px;
+}
+
+.compact-heading h3 {
+  margin: 0;
+}
+
+.schedule-builder {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 22px;
+}
+
+.schedule-rule-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
+}
+
+.schedule-rule-form .button {
+  align-self: end;
+}
+
+.rules-list {
+  display: grid;
+  gap: 12px;
+}
+
+.rule-item {
+  align-items: center;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.rule-item div {
+  display: grid;
+  gap: 3px;
+}
+
+.rule-item span,
+.rule-item small {
+  color: var(--muted);
+}
+
+.text-button {
+  background: transparent;
+  border: 0;
+  color: var(--brand-dark);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 6px 0;
+}
+
 .tab-button {
   background: var(--cream);
   border: 1px solid var(--line);
@@ -592,6 +651,10 @@ textarea {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+
+  .schedule-rule-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -614,5 +677,9 @@ textarea {
   .hero,
   .section {
     padding: 46px 18px;
+  }
+
+  .schedule-rule-form {
+    grid-template-columns: 1fr;
   }
 }

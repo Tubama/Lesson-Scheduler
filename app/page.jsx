@@ -3,42 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
-const schedules = {
-  school: {
-    label: "School year 2026-2027",
-    locations: {
-      Vacaville: [
-        { day: "Monday", start: "3:00 PM", length: 30, status: "open" },
-        { day: "Monday", start: "3:30 PM", length: 45, status: "held" },
-        { day: "Wednesday", start: "4:15 PM", length: 45, status: "open" },
-        { day: "Friday", start: "5:00 PM", length: 60, status: "open" },
-        { day: "Friday", start: "6:15 PM", length: 30, status: "open" }
-      ],
-      Davis: [
-        { day: "Tuesday", start: "3:00 PM", length: 45, status: "open" },
-        { day: "Tuesday", start: "5:15 PM", length: 60, status: "held" },
-        { day: "Thursday", start: "2:45 PM", length: 30, status: "open" },
-        { day: "Thursday", start: "6:30 PM", length: 45, status: "open" },
-        { day: "Saturday", start: "9:00 AM", length: 60, status: "open" }
-      ]
-    }
-  },
-  summer: {
-    label: "Summer lesson block",
-    locations: {
-      Vacaville: [
-        { day: "Monday", start: "10:00 AM", length: 45, status: "open" },
-        { day: "Wednesday", start: "11:00 AM", length: 30, status: "open" },
-        { day: "Friday", start: "1:00 PM", length: 60, status: "open" }
-      ],
-      Davis: [
-        { day: "Tuesday", start: "9:30 AM", length: 30, status: "open" },
-        { day: "Thursday", start: "10:15 AM", length: 45, status: "held" },
-        { day: "Saturday", start: "12:00 PM", length: 60, status: "open" }
-      ]
-    }
-  }
-};
+const defaultScheduleRules = [
+  { id: "default-school-vacaville-monday", term: "school", location: "Vacaville", day_of_week: "Monday", start_time: "15:00", end_time: "20:00", active: true },
+  { id: "default-school-vacaville-wednesday", term: "school", location: "Vacaville", day_of_week: "Wednesday", start_time: "15:00", end_time: "20:00", active: true },
+  { id: "default-school-vacaville-friday", term: "school", location: "Vacaville", day_of_week: "Friday", start_time: "15:00", end_time: "20:00", active: true },
+  { id: "default-school-davis-tuesday", term: "school", location: "Davis", day_of_week: "Tuesday", start_time: "15:00", end_time: "20:45", active: true },
+  { id: "default-school-davis-thursday", term: "school", location: "Davis", day_of_week: "Thursday", start_time: "14:45", end_time: "20:00", active: true },
+  { id: "default-school-davis-saturday", term: "school", location: "Davis", day_of_week: "Saturday", start_time: "09:00", end_time: "14:45", active: true },
+  { id: "default-summer-vacaville-monday", term: "summer", location: "Vacaville", day_of_week: "Monday", start_time: "10:00", end_time: "13:00", active: true },
+  { id: "default-summer-davis-tuesday", term: "summer", location: "Davis", day_of_week: "Tuesday", start_time: "09:30", end_time: "12:30", active: true }
+];
+
+const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const initialForm = {
   term: "school",
@@ -60,12 +36,63 @@ const initialAdminLogin = {
   password: ""
 };
 
+const initialScheduleRule = {
+  term: "school",
+  location: "Vacaville",
+  day_of_week: "Monday",
+  start_time: "15:00",
+  end_time: "20:00"
+};
+
+function minutesFromTime(time) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatTime(minutes) {
+  const hours24 = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const suffix = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(mins).padStart(2, "0")} ${suffix}`;
+}
+
 function slotLabel(slot) {
   return `${slot.day} at ${slot.start} (${slot.length} minutes)`;
 }
 
-function getAllSlots(term) {
-  return Object.values(schedules[term].locations).flat();
+function generateSlots(rules, term, location, lessonLength) {
+  return rules
+    .filter((rule) => rule.active !== false && rule.term === term && (!location || rule.location === location))
+    .flatMap((rule) => {
+      const start = minutesFromTime(rule.start_time);
+      const end = minutesFromTime(rule.end_time);
+      const slots = [];
+
+      for (let current = start; current + lessonLength <= end; current += lessonLength) {
+        slots.push({
+          day: rule.day_of_week,
+          start: formatTime(current),
+          length: lessonLength,
+          location: rule.location,
+          status: "open"
+        });
+      }
+
+      return slots;
+    });
+}
+
+function sortRules(rules) {
+  return [...rules].sort((a, b) => {
+    const termCompare = a.term.localeCompare(b.term);
+    if (termCompare) return termCompare;
+    const locationCompare = a.location.localeCompare(b.location);
+    if (locationCompare) return locationCompare;
+    const dayCompare = weekdays.indexOf(a.day_of_week) - weekdays.indexOf(b.day_of_week);
+    if (dayCompare) return dayCompare;
+    return a.start_time.localeCompare(b.start_time);
+  });
 }
 
 export default function Home() {
@@ -78,16 +105,18 @@ export default function Home() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [registrationRequests, setRegistrationRequests] = useState([]);
   const [waitlistEntries, setWaitlistEntries] = useState([]);
+  const [scheduleRules, setScheduleRules] = useState(defaultScheduleRules);
+  const [scheduleRuleForm, setScheduleRuleForm] = useState(initialScheduleRule);
+  const [scheduleMessage, setScheduleMessage] = useState("");
 
   const filteredSlots = useMemo(() => {
-    const slots = schedules[form.term].locations[form.location] || [];
-    return slots.filter((slot) => slot.length === Number(form.lessonLength));
-  }, [form.term, form.location, form.lessonLength]);
+    return generateSlots(scheduleRules, form.term, form.location, Number(form.lessonLength));
+  }, [scheduleRules, form.term, form.location, form.lessonLength]);
 
   const openSlots = filteredSlots.filter((slot) => slot.status === "open");
-  const allSlots = getAllSlots(form.term);
+  const allSlots = generateSlots(scheduleRules, form.term, null, Number(form.lessonLength));
   const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
-  const pendingCount = allSlots.filter((slot) => slot.status === "held").length;
+  const pendingCount = registrationRequests.filter((request) => request.status === "pending").length;
   const isNewFamily = form.familyType === "new";
   const adminCards = useMemo(() => {
     if (adminFilter === "waitlist") {
@@ -153,6 +182,8 @@ export default function Home() {
   useEffect(() => {
     if (!supabase) return;
 
+    loadScheduleRules();
+
     supabase.auth.getSession().then(({ data }) => {
       setAdminSession(data.session);
     });
@@ -186,6 +217,92 @@ export default function Home() {
   function updateAdminLogin(event) {
     const { name, value } = event.target;
     setAdminLogin((current) => ({ ...current, [name]: value }));
+  }
+
+  function updateScheduleRuleForm(event) {
+    const { name, value } = event.target;
+    setScheduleRuleForm((current) => ({ ...current, [name]: value }));
+  }
+
+  async function loadScheduleRules() {
+    if (!supabase) return;
+
+    const { data, error } = await supabase
+      .from("schedule_rules")
+      .select("id, term, location, day_of_week, start_time, end_time, active")
+      .eq("active", true)
+      .order("term")
+      .order("location")
+      .order("day_of_week");
+
+    if (error) {
+      setScheduleMessage(`Using default schedule until Supabase schedule rules are available: ${error.message}`);
+      setScheduleRules(defaultScheduleRules);
+      return;
+    }
+
+    setScheduleRules(data?.length ? data : defaultScheduleRules);
+    setScheduleMessage(data?.length ? "Schedule loaded." : "Using default schedule. Add rules below to customize it.");
+  }
+
+  async function addScheduleRule(event) {
+    event.preventDefault();
+    setAdminLoading(true);
+    setScheduleMessage("Adding schedule rule...");
+
+    if (!supabase) {
+      setScheduleMessage("Supabase is not configured yet.");
+      setAdminLoading(false);
+      return;
+    }
+
+    if (minutesFromTime(scheduleRuleForm.start_time) >= minutesFromTime(scheduleRuleForm.end_time)) {
+      setScheduleMessage("Start time must be before end time.");
+      setAdminLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.from("schedule_rules").insert({
+      ...scheduleRuleForm,
+      active: true
+    });
+
+    if (error) {
+      setScheduleMessage(`Could not add schedule rule: ${error.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    setScheduleRuleForm(initialScheduleRule);
+    await loadScheduleRules();
+    setScheduleMessage("Schedule rule added.");
+    setAdminLoading(false);
+  }
+
+  async function deleteScheduleRule(ruleId) {
+    setAdminLoading(true);
+    setScheduleMessage("Removing schedule rule...");
+
+    if (!supabase) {
+      setScheduleMessage("Supabase is not configured yet.");
+      setAdminLoading(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("schedule_rules")
+      .update({ active: false })
+      .eq("id", ruleId);
+
+    if (error) {
+      setScheduleMessage(`Could not remove schedule rule: ${error.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    await loadScheduleRules();
+    setScheduleMessage("Schedule rule removed.");
+    setAdminLoading(false);
   }
 
   async function signInAdmin(event) {
@@ -248,6 +365,7 @@ export default function Home() {
 
     setRegistrationRequests(registrationsResult.data || []);
     setWaitlistEntries(waitlistResult.data || []);
+    await loadScheduleRules();
     setAdminMessage("Requests loaded.");
     setAdminLoading(false);
   }
@@ -639,25 +757,66 @@ export default function Home() {
                       </div>
                     )}
                   </div>
+                  <div className="schedule-builder">
+                    <div className="section-heading compact-heading">
+                      <p className="eyebrow">Schedule builder</p>
+                      <h3>Add teaching availability</h3>
+                      <p>Create recurring weekly teaching blocks. Parent time choices are generated from these rules.</p>
+                    </div>
+                    <form className="schedule-rule-form" onSubmit={addScheduleRule}>
+                      <label>
+                        Schedule
+                        <select name="term" value={scheduleRuleForm.term} onChange={updateScheduleRuleForm}>
+                          <option value="school">School year</option>
+                          <option value="summer">Summer</option>
+                        </select>
+                      </label>
+                      <label>
+                        Location
+                        <select name="location" value={scheduleRuleForm.location} onChange={updateScheduleRuleForm}>
+                          <option value="Vacaville">Vacaville</option>
+                          <option value="Davis">Davis</option>
+                        </select>
+                      </label>
+                      <label>
+                        Day
+                        <select name="day_of_week" value={scheduleRuleForm.day_of_week} onChange={updateScheduleRuleForm}>
+                          {weekdays.map((day) => (
+                            <option key={day} value={day}>{day}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Start
+                        <input type="time" name="start_time" value={scheduleRuleForm.start_time} onChange={updateScheduleRuleForm} />
+                      </label>
+                      <label>
+                        End
+                        <input type="time" name="end_time" value={scheduleRuleForm.end_time} onChange={updateScheduleRuleForm} />
+                      </label>
+                      <button className="button primary" type="submit" disabled={adminLoading}>Add rule</button>
+                    </form>
+                    {scheduleMessage && <p className="admin-message">{scheduleMessage}</p>}
+                  </div>
                 </>
               )}
             </div>
             <aside className="rules-card">
               <h3>Schedule rules</h3>
-              <dl>
-                <div>
-                  <dt>Vacaville</dt>
-                  <dd>Monday, Wednesday, Friday - 3:00 PM to 8:00 PM</dd>
-                </div>
-                <div>
-                  <dt>Davis</dt>
-                  <dd>Tuesday 3:00 PM to 8:45 PM, Thursday 2:45 PM to 8:00 PM, Saturday 9:00 AM to 2:45 PM</dd>
-                </div>
-                <div>
-                  <dt>Approval</dt>
-                  <dd>Every request stays pending until reviewed.</dd>
-                </div>
-              </dl>
+              <div className="rules-list">
+                {sortRules(scheduleRules).map((rule) => (
+                  <article className="rule-item" key={rule.id}>
+                    <div>
+                      <strong>{rule.location}</strong>
+                      <span>{rule.term === "school" ? "School year" : "Summer"} · {rule.day_of_week}</span>
+                      <small>{formatTime(minutesFromTime(rule.start_time))} to {formatTime(minutesFromTime(rule.end_time))}</small>
+                    </div>
+                    {adminSession && !String(rule.id).startsWith("default-") && (
+                      <button className="text-button" type="button" onClick={() => deleteScheduleRule(rule.id)}>Remove</button>
+                    )}
+                  </article>
+                ))}
+              </div>
             </aside>
           </div>
         </section>

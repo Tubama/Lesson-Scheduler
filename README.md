@@ -12,6 +12,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Pending approval workflow preview
 - New student waitlist and 4-lesson trial process
 - Admin sign-in for reading and updating real Supabase requests
+- Admin schedule builder for recurring weekly teaching blocks
 
 ## Run locally
 
@@ -44,14 +45,16 @@ The schema adds:
 - `registration_requests`
 - `waitlist_entries`
 - `studio_admins`
+- `schedule_rules`
 - Row level security policies for public inserts
+- Public schedule-rule reads
 - Authenticated admin read/update policies
 
 The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user with that email, or update `studio_admins` to match the email you want to use for admin login.
 
 ## Planned next steps
 
-- Add a real schedule builder
+- Prevent duplicate pending requests for the same recurring time
 - Add Google Calendar sync for approved recurring lessons
 - Add email confirmations
 - Deploy through Vercel
