@@ -648,6 +648,52 @@ textarea {
   padding-top: 22px;
 }
 
+.approved-schedule {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+}
+
+.approved-groups,
+.approved-row-list {
+  display: grid;
+  gap: 10px;
+}
+
+.approved-group {
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.approved-group h4 {
+  margin: 0 0 10px;
+}
+
+.approved-row {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 90px minmax(120px, 1fr) minmax(180px, 1.4fr);
+  padding: 10px 12px;
+}
+
+.approved-row strong,
+.approved-row span {
+  color: var(--ink);
+}
+
+.approved-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .schedule-rule-form {
   display: grid;
   gap: 12px;

@@ -273,6 +273,50 @@ export default function Home() {
       }));
   }, [adminFilter, registrationRequests, waitlistEntries]);
 
+  const approvedScheduleGroups = useMemo(() => {
+    const approvedRows = registrationRequests
+      .filter((request) => request.status === "approved" && request.first_choice)
+      .map((request) => {
+        const parsedChoice = parseSlotLabel(request.first_choice);
+        if (!parsedChoice) return null;
+
+        return {
+          id: request.id,
+          term: request.term,
+          location: request.location,
+          day: parsedChoice.day,
+          startMinutes: parsedChoice.startMinutes,
+          time: formatTime(parsedChoice.startMinutes),
+          studentName: request.student_name,
+          parentName: request.parent_name,
+          email: request.email,
+          lessonLength: request.lesson_length
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const termCompare = a.term.localeCompare(b.term);
+        if (termCompare) return termCompare;
+        const locationCompare = a.location.localeCompare(b.location);
+        if (locationCompare) return locationCompare;
+        const dayCompare = weekdays.indexOf(a.day) - weekdays.indexOf(b.day);
+        if (dayCompare) return dayCompare;
+        return a.startMinutes - b.startMinutes;
+      });
+
+    return approvedRows.reduce((groups, row) => {
+      const title = `${row.term === "summer" ? "Summer" : "School year"} · ${row.location} · ${row.day}`;
+      const existingGroup = groups.find((group) => group.title === title);
+
+      if (existingGroup) {
+        existingGroup.rows.push(row);
+        return groups;
+      }
+
+      return [...groups, { title, rows: [row] }];
+    }, []);
+  }, [registrationRequests]);
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -1073,6 +1117,36 @@ export default function Home() {
                     ))}
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
+                  <section className="approved-schedule">
+                    <div className="section-heading compact-heading">
+                      <p className="eyebrow">Approved schedule</p>
+                      <h3>Final recurring placements</h3>
+                      <p>Approved requests appear here grouped by schedule, location, day, and start time.</p>
+                    </div>
+                    {approvedScheduleGroups.length ? (
+                      <div className="approved-groups">
+                        {approvedScheduleGroups.map((group) => (
+                          <article className="approved-group" key={group.title}>
+                            <h4>{group.title}</h4>
+                            <div className="approved-row-list">
+                              {group.rows.map((row) => (
+                                <div className="approved-row" key={row.id}>
+                                  <strong>{row.time}</strong>
+                                  <span>{row.studentName}</span>
+                                  <small>{row.lessonLength} minutes · {row.parentName} · {row.email}</small>
+                                </div>
+                              ))}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <strong>No approved placements yet.</strong>
+                        <span>Approved registration requests will appear here as your final schedule takes shape.</span>
+                      </div>
+                    )}
+                  </section>
                   <div className="admin-list">
                     {adminCards.length ? (
                       adminCards.map((item) => {
