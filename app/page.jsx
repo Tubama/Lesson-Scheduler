@@ -149,6 +149,7 @@ function sortRules(rules) {
 
 export default function Home() {
   const [form, setForm] = useState(initialForm);
+  const [selectedDay, setSelectedDay] = useState("");
   const [adminFilter, setAdminFilter] = useState("pending");
   const [submitState, setSubmitState] = useState({ status: "idle", message: "" });
   const [adminLogin, setAdminLogin] = useState(initialAdminLogin);
@@ -167,6 +168,18 @@ export default function Home() {
   }, [scheduleRules, scheduleHolds, form.term, form.location, form.lessonLength]);
 
   const openSlots = filteredSlots.filter((slot) => slot.status === "open");
+  const slotsByDay = useMemo(() => {
+    return weekdays
+      .map((day) => ({
+        day,
+        slots: filteredSlots.filter((slot) => slot.day === day),
+        openCount: filteredSlots.filter((slot) => slot.day === day && slot.status === "open").length
+      }))
+      .filter((group) => group.slots.length > 0);
+  }, [filteredSlots]);
+  const selectedDaySlots = selectedDay
+    ? filteredSlots.filter((slot) => slot.day === selectedDay)
+    : slotsByDay[0]?.slots || [];
   const allSlots = generateSlots(scheduleRules, scheduleHolds, form.term, null, Number(form.lessonLength));
   const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
   const pendingCount = registrationRequests.filter((request) => request.status === "pending").length;
@@ -255,6 +268,17 @@ export default function Home() {
     }
   }, [adminSession]);
 
+  useEffect(() => {
+    if (!slotsByDay.length) {
+      setSelectedDay("");
+      return;
+    }
+
+    if (!slotsByDay.some((group) => group.day === selectedDay)) {
+      setSelectedDay(slotsByDay[0].day);
+    }
+  }, [slotsByDay, selectedDay]);
+
   function updateForm(event) {
     const { name, value } = event.target;
     setForm((current) => {
@@ -276,6 +300,20 @@ export default function Home() {
   function updateScheduleRuleForm(event) {
     const { name, value } = event.target;
     setScheduleRuleForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function selectPreferredTime(label) {
+    setForm((current) => {
+      const choiceFields = ["firstChoice", "secondChoice", "thirdChoice"];
+      const existingField = choiceFields.find((field) => current[field] === label);
+
+      if (existingField) {
+        return { ...current, [existingField]: "" };
+      }
+
+      const emptyField = choiceFields.find((field) => !current[field]);
+      return { ...current, [emptyField || "thirdChoice"]: label };
+    });
   }
 
   async function loadScheduleRules() {
@@ -383,6 +421,14 @@ export default function Home() {
     if (!isSupabaseConfigured || !supabase) {
       setAdminMessage("Supabase is not configured yet.");
       setAdminLoading(false);
+      return;
+    }
+
+    if (!isNewFamily && !form.firstChoice) {
+      setSubmitState({
+        status: "error",
+        message: "Please choose at least a first-choice lesson time."
+      });
       return;
     }
 
@@ -689,24 +735,80 @@ export default function Home() {
                 </select>
               </label>
 
-              <fieldset>
-                <legend>Preferred recurring times</legend>
-                <div className="choice-grid">
-                  {["firstChoice", "secondChoice", "thirdChoice"].map((choice, index) => (
-                    <label key={choice}>
-                      {index === 0 ? "First choice" : index === 1 ? "Second choice" : "Third choice"}
-                      <select name={choice} value={form[choice]} onChange={updateForm} disabled={isNewFamily}>
-                        <option value="">{index === 0 ? "Choose first choice" : `Choose choice ${index + 1}`}</option>
-                        {openSlots.map((slot) => (
-                          <option key={`${choice}-${slotLabel(slot)}`} value={slotLabel(slot)}>
-                            {slotLabel(slot)}
-                          </option>
+              {!isNewFamily && (
+                <section className="time-picker" aria-label="Preferred recurring lesson times">
+                  <div className="time-picker-heading">
+                    <div>
+                      <p className="eyebrow">Preferred recurring times</p>
+                      <h3>{form.location} {form.lessonLength}-minute starts</h3>
+                    </div>
+                    <span>{openSlots.length} available</span>
+                  </div>
+
+                  {slotsByDay.length ? (
+                    <>
+                      <div className="day-grid" aria-label="Choose a preferred day">
+                        {slotsByDay.map((group) => (
+                          <button
+                            className={`day-card ${selectedDay === group.day ? "active" : ""}`}
+                            key={group.day}
+                            onClick={() => setSelectedDay(group.day)}
+                            type="button"
+                          >
+                            <strong>{group.day}</strong>
+                            <span>{group.openCount} open</span>
+                          </button>
                         ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+                      </div>
+
+                      <div className="time-grid" aria-label={`${selectedDay || "Selected day"} times`}>
+                        {selectedDaySlots.map((slot) => {
+                          const label = slotLabel(slot);
+                          const choiceIndex = [form.firstChoice, form.secondChoice, form.thirdChoice].indexOf(label);
+                          const isSelected = choiceIndex >= 0;
+
+                          return (
+                            <button
+                              className={`time-button ${slot.status === "held" ? "held" : ""} ${isSelected ? "selected" : ""}`}
+                              disabled={slot.status === "held"}
+                              key={label}
+                              onClick={() => selectPreferredTime(label)}
+                              type="button"
+                            >
+                              <span>{slot.start}</span>
+                              <small>
+                                {slot.status === "held"
+                                  ? "Held"
+                                  : isSelected
+                                    ? `Choice ${choiceIndex + 1}`
+                                    : "Available"}
+                              </small>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="empty-state">
+                      <strong>No start times available.</strong>
+                      <span>Try a different location or lesson length.</span>
+                    </div>
+                  )}
+
+                  <div className="choice-summary">
+                    {[
+                      ["First choice", form.firstChoice],
+                      ["Second choice", form.secondChoice],
+                      ["Third choice", form.thirdChoice]
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <span>{label}</span>
+                        <strong>{value || "Not selected"}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <label>
                 Notes
@@ -734,27 +836,16 @@ export default function Home() {
               )}
             </form>
 
-            <aside className="availability-card">
-              <div className="card-heading">
-                <p className="eyebrow">Live preview</p>
-                <h3>{form.location} {form.lessonLength}-minute starts</h3>
-              </div>
-              <div className="slot-list">
-                {filteredSlots.length ? (
-                  filteredSlots.map((slot) => (
-                    <div className={`slot ${slot.status === "held" ? "held" : ""}`} key={slotLabel(slot)}>
-                      <strong>{slotLabel(slot)}</strong>
-                      <span className="slot-meta">
-                        {slot.status === "held" ? "Held pending approval" : "Available to request"}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="slot">
-                    <strong>No start times available</strong>
-                    <span className="slot-meta">Try a different lesson length or join the waitlist.</span>
-                  </div>
-                )}
+            <aside className="availability-card guidance-card">
+              <p className="eyebrow">How requests work</p>
+              <h3>Pick up to three options</h3>
+              <p>
+                Choose the day first, then select your preferred start times. Your first choice is held while the request is pending.
+              </p>
+              <div className="mini-rules">
+                <span>30, 45, or 60 minutes</span>
+                <span>Pending until approved</span>
+                <span>No overlapping holds</span>
               </div>
             </aside>
           </div>

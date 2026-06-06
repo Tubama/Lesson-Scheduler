@@ -315,10 +315,6 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.choice-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .form-footer {
   align-items: center;
   display: flex;
@@ -354,27 +350,161 @@ textarea {
   color: #557f95;
 }
 
-.slot-list,
+.time-picker {
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.time-picker-heading {
+  align-items: flex-end;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.time-picker-heading h3 {
+  margin: 0;
+}
+
+.time-picker-heading span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.day-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.day-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 70px;
+  padding: 12px;
+  text-align: left;
+}
+
+.day-card.active {
+  background: var(--soft-2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(122, 154, 174, 0.14);
+}
+
+.day-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.time-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.time-button {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px;
+  text-align: left;
+}
+
+.time-button span {
+  font-weight: 900;
+}
+
+.time-button small {
+  color: var(--muted);
+}
+
+.time-button.selected {
+  background: #eef7f2;
+  border-color: #7ca88e;
+}
+
+.time-button.held,
+.time-button:disabled {
+  background: var(--soft-2);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.choice-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.choice-summary div {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.choice-summary span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.choice-summary strong {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.guidance-card {
+  display: grid;
+  gap: 14px;
+}
+
+.guidance-card h3,
+.guidance-card p {
+  margin: 0;
+}
+
+.guidance-card p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.mini-rules {
+  display: grid;
+  gap: 10px;
+}
+
+.mini-rules span {
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 12px;
+}
+
 .admin-list {
   display: grid;
   gap: 12px;
-}
-
-.slot {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--cream);
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-}
-
-.slot strong {
-  font-size: 1.04rem;
-}
-
-.slot.held {
-  background: var(--soft-2);
 }
 
 .muted {
