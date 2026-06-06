@@ -167,6 +167,7 @@ export default function Home() {
   const [scheduleHolds, setScheduleHolds] = useState([]);
   const [scheduleRuleForm, setScheduleRuleForm] = useState(initialScheduleRule);
   const [scheduleMessage, setScheduleMessage] = useState("");
+  const [moveSelections, setMoveSelections] = useState({});
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
@@ -197,12 +198,15 @@ export default function Home() {
           .map((item) => ({
             id: item.id,
             table: "registration_requests",
+            term: item.term,
             status: item.status,
             name: item.student_name,
             details: `${item.parent_name} was moved from registration requests to the waitlist.`,
             choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
             email: item.email,
             parentName: item.parent_name,
+            lessonLength: item.lesson_length,
+            location: item.location,
             studentBirthdate: item.student_birthdate,
             emergencyContact: item.emergency_contact_name,
             emergencyPhone: item.emergency_contact_phone,
@@ -251,12 +255,15 @@ export default function Home() {
       .map((item) => ({
         id: item.id,
         table: "registration_requests",
+        term: item.term,
         status: item.status,
         name: item.student_name,
         details: `${item.family_type === "returning" ? "Returning" : "New"} student requesting ${item.location}, ${item.lesson_length} minutes.`,
         choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
         email: item.email,
         parentName: item.parent_name,
+        lessonLength: item.lesson_length,
+        location: item.location,
         studentBirthdate: item.student_birthdate,
         emergencyContact: item.emergency_contact_name,
         emergencyPhone: item.emergency_contact_phone,
@@ -335,6 +342,69 @@ export default function Home() {
       const emptyField = choiceFields.find((field) => !current[field]);
       return { ...current, [emptyField || "thirdChoice"]: label };
     });
+  }
+
+  function moveOptionsFor(item) {
+    if (item.table !== "registration_requests" || !item.term || !item.location || !item.lessonLength) {
+      return [];
+    }
+
+    const holdsWithoutCurrentRequest = scheduleHolds.filter((hold) => hold.request_id !== item.id);
+    return generateSlots(scheduleRules, holdsWithoutCurrentRequest, item.term, item.location, Number(item.lessonLength))
+      .filter((slot) => slot.status === "open");
+  }
+
+  async function moveRequestTime(item) {
+    if (!supabase) return;
+
+    const nextChoice = moveSelections[item.id];
+    const parsedChoice = nextChoice ? parseSlotLabel(nextChoice) : null;
+
+    if (!parsedChoice) {
+      setAdminMessage("Choose a new generated time before moving this student.");
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage("Moving lesson time...");
+
+    const holdActive = ["pending", "approved"].includes(item.status);
+    const { data: movedHold, error: holdError } = await supabase
+      .from("schedule_holds")
+      .update({
+        day_of_week: parsedChoice.day,
+        start_minutes: parsedChoice.startMinutes,
+        end_minutes: parsedChoice.endMinutes,
+        status: item.status,
+        active: holdActive
+      })
+      .eq("request_id", item.id)
+      .select("id")
+      .maybeSingle();
+
+    if (holdError || !movedHold) {
+      setAdminMessage(holdError
+        ? `The schedule hold could not be moved: ${holdError.message}`
+        : "No matching schedule hold was found to move."
+      );
+      setAdminLoading(false);
+      return;
+    }
+
+    const { error: requestError } = await supabase
+      .from("registration_requests")
+      .update({ first_choice: nextChoice })
+      .eq("id", item.id);
+
+    if (requestError) {
+      setAdminMessage(`The hold moved, but the request time could not be updated: ${requestError.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    setMoveSelections((current) => ({ ...current, [item.id]: "" }));
+    await loadAdminData();
+    setAdminMessage("Lesson time moved.");
   }
 
   async function loadScheduleRules() {
@@ -1005,37 +1075,65 @@ export default function Home() {
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
                   <div className="admin-list">
                     {adminCards.length ? (
-                      adminCards.map((item) => (
-                        <article className="admin-card" key={`${item.table}-${item.id}`}>
-                          <span className={`status-pill status-${item.status}`}>{item.status}</span>
-                          <h3>{item.name}</h3>
-                          <p>{item.details}</p>
-                          <p>{item.choices}</p>
-                          {item.parentName && <p>Parent: {item.parentName}</p>}
-                          <p>Email: {item.email}</p>
-                          {item.studentBirthdate && <p>Birthdate: {item.studentBirthdate}</p>}
-                          {item.emergencyContact && <p>Emergency contact: {item.emergencyContact}</p>}
-                          {item.emergencyPhone && <p>Emergency phone: {item.emergencyPhone}</p>}
-                          {item.signedName && <p>Signed by: {item.signedName}</p>}
-                          {item.notes && <p>Notes: {item.notes}</p>}
-                          <div className="admin-card-actions">
-                            {item.table === "registration_requests" && item.status === "pending" && (
-                              <>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "approved")}>Approve</button>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "rejected")}>Reject</button>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "waitlist")}>Waitlist</button>
-                              </>
+                      adminCards.map((item) => {
+                        const moveOptions = moveOptionsFor(item);
+
+                        return (
+                          <article className="admin-card" key={`${item.table}-${item.id}`}>
+                            <span className={`status-pill status-${item.status}`}>{item.status}</span>
+                            <h3>{item.name}</h3>
+                            <p>{item.details}</p>
+                            <p>{item.choices}</p>
+                            {item.parentName && <p>Parent: {item.parentName}</p>}
+                            <p>Email: {item.email}</p>
+                            {item.studentBirthdate && <p>Birthdate: {item.studentBirthdate}</p>}
+                            {item.emergencyContact && <p>Emergency contact: {item.emergencyContact}</p>}
+                            {item.emergencyPhone && <p>Emergency phone: {item.emergencyPhone}</p>}
+                            {item.signedName && <p>Signed by: {item.signedName}</p>}
+                            {item.notes && <p>Notes: {item.notes}</p>}
+                            {item.table === "registration_requests" && ["pending", "approved"].includes(item.status) && (
+                              <div className="move-tool">
+                                <label>
+                                  Move to generated time
+                                  <select
+                                    value={moveSelections[item.id] || ""}
+                                    onChange={(event) => setMoveSelections((current) => ({ ...current, [item.id]: event.target.value }))}
+                                  >
+                                    <option value="">Choose a new time</option>
+                                    {moveOptions.map((slot) => {
+                                      const label = slotLabel(slot);
+                                      return (
+                                        <option key={`${item.id}-${label}`} value={label}>
+                                          {label}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </label>
+                                <button className="button secondary" type="button" onClick={() => moveRequestTime(item)}>
+                                  Move
+                                </button>
+                              </div>
                             )}
-                            {item.table === "waitlist_entries" && (
-                              <>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "invited")}>Invite</button>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "trial")}>Start trial</button>
-                                <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "closed")}>Close</button>
-                              </>
-                            )}
-                          </div>
-                        </article>
-                      ))
+                            <div className="admin-card-actions">
+                              {item.table === "registration_requests" && item.status === "pending" && (
+                                <>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "approved")}>Approve</button>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "rejected")}>Reject</button>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "waitlist")}>Waitlist</button>
+                                </>
+                              )}
+                              {item.table === "waitlist_entries" && (
+                                <>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "invited")}>Invite</button>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "trial")}>Start trial</button>
+                                  <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "closed")}>Close</button>
+                                </>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })
                     ) : (
                       <div className="empty-state">
                         <strong>No {adminFilter} requests yet.</strong>

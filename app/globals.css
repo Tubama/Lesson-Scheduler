@@ -725,6 +725,20 @@ textarea {
   margin: 0 0 12px;
 }
 
+.move-tool {
+  align-items: end;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.move-tool label {
+  gap: 6px;
+}
+
 .status-pill {
   border-radius: 999px;
   display: inline-flex;
