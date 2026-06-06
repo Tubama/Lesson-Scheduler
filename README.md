@@ -8,6 +8,8 @@ A prototype web app for yearly and summer music lesson placement.
 - School year and summer schedule modes
 - Location-based availability for Vacaville and Davis
 - 30, 45, and 60 minute lesson choices with displayed prices
+- Student birthdate and emergency contact collection
+- Studio policy acknowledgment with typed parent/guardian name
 - First, second, and third choice requests
 - Pending approval workflow preview
 - New student waitlist and 4-lesson trial process

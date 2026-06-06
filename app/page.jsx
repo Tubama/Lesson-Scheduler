@@ -23,11 +23,16 @@ const initialForm = {
   parentName: "",
   email: "",
   studentName: "",
+  studentBirthdate: "",
+  emergencyContactName: "",
+  emergencyContactPhone: "",
   lessonLength: "30",
   location: "Vacaville",
   firstChoice: "",
   secondChoice: "",
   thirdChoice: "",
+  policyAcknowledged: false,
+  signedName: "",
   notes: ""
 };
 
@@ -198,6 +203,10 @@ export default function Home() {
             choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
             email: item.email,
             parentName: item.parent_name,
+            studentBirthdate: item.student_birthdate,
+            emergencyContact: item.emergency_contact_name,
+            emergencyPhone: item.emergency_contact_phone,
+            signedName: item.signed_name,
             notes: item.notes,
             createdAt: item.created_at
           })),
@@ -209,6 +218,10 @@ export default function Home() {
           details: `${item.parent_name} requested the waitlist for ${item.location}, ${item.lesson_length} minutes.`,
           choices: item.notes || "No notes provided.",
           email: item.email,
+          studentBirthdate: item.student_birthdate,
+          emergencyContact: item.emergency_contact_name,
+          emergencyPhone: item.emergency_contact_phone,
+          signedName: item.signed_name,
           createdAt: item.created_at
         }))
       ];
@@ -225,6 +238,10 @@ export default function Home() {
           details: `${item.parent_name} is in a 4-lesson trial for ${item.location}, ${item.lesson_length} minutes.`,
           choices: item.notes || "No notes provided.",
           email: item.email,
+          studentBirthdate: item.student_birthdate,
+          emergencyContact: item.emergency_contact_name,
+          emergencyPhone: item.emergency_contact_phone,
+          signedName: item.signed_name,
           createdAt: item.created_at
         }));
     }
@@ -240,6 +257,10 @@ export default function Home() {
         choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
         email: item.email,
         parentName: item.parent_name,
+        studentBirthdate: item.student_birthdate,
+        emergencyContact: item.emergency_contact_name,
+        emergencyPhone: item.emergency_contact_phone,
+        signedName: item.signed_name,
         notes: item.notes,
         createdAt: item.created_at
       }));
@@ -280,9 +301,9 @@ export default function Home() {
   }, [slotsByDay, selectedDay]);
 
   function updateForm(event) {
-    const { name, value } = event.target;
+    const { checked, name, type, value } = event.target;
     setForm((current) => {
-      const next = { ...current, [name]: value };
+      const next = { ...current, [name]: type === "checkbox" ? checked : value };
       if (["term", "location", "lessonLength"].includes(name)) {
         next.firstChoice = "";
         next.secondChoice = "";
@@ -456,11 +477,11 @@ export default function Home() {
     const [registrationsResult, waitlistResult] = await Promise.all([
       supabase
         .from("registration_requests")
-        .select("id, created_at, term, family_type, parent_name, email, student_name, lesson_length, location, first_choice, second_choice, third_choice, notes, status")
+        .select("id, created_at, term, family_type, parent_name, email, student_name, student_birthdate, emergency_contact_name, emergency_contact_phone, lesson_length, location, first_choice, second_choice, third_choice, policy_acknowledged, signed_name, notes, status")
         .order("created_at", { ascending: false }),
       supabase
         .from("waitlist_entries")
-        .select("id, created_at, parent_name, email, student_name, lesson_length, location, notes, status")
+        .select("id, created_at, parent_name, email, student_name, student_birthdate, emergency_contact_name, emergency_contact_phone, lesson_length, location, policy_acknowledged, signed_name, notes, status")
         .order("created_at", { ascending: false })
     ]);
 
@@ -540,11 +561,16 @@ export default function Home() {
       parent_name: form.parentName,
       email: form.email,
       student_name: form.studentName,
+      student_birthdate: form.studentBirthdate || null,
+      emergency_contact_name: form.emergencyContactName,
+      emergency_contact_phone: form.emergencyContactPhone,
       lesson_length: Number(form.lessonLength),
       location: form.location,
       first_choice: isNewFamily ? null : form.firstChoice || null,
       second_choice: isNewFamily ? null : form.secondChoice || null,
       third_choice: isNewFamily ? null : form.thirdChoice || null,
+      policy_acknowledged: form.policyAcknowledged,
+      signed_name: form.signedName,
       notes: form.notes || null
     };
 
@@ -556,8 +582,13 @@ export default function Home() {
           parent_name: payload.parent_name,
           email: payload.email,
           student_name: payload.student_name,
+          student_birthdate: payload.student_birthdate,
+          emergency_contact_name: payload.emergency_contact_name,
+          emergency_contact_phone: payload.emergency_contact_phone,
           lesson_length: payload.lesson_length,
           location: payload.location,
+          policy_acknowledged: payload.policy_acknowledged,
+          signed_name: payload.signed_name,
           notes: payload.notes
         }
       : payload;
@@ -724,22 +755,49 @@ export default function Home() {
                   <input required name="studentName" value={form.studentName} onChange={updateForm} placeholder="Student name" />
                 </label>
                 <label>
-                  Lesson length
-                  <select name="lessonLength" value={form.lessonLength} onChange={updateForm}>
-                    <option value="30">30 minutes - $42</option>
-                    <option value="45">45 minutes - $62</option>
-                    <option value="60">60 minutes - $82</option>
-                  </select>
+                  Student date of birth
+                  <input required type="date" name="studentBirthdate" value={form.studentBirthdate} onChange={updateForm} />
                 </label>
               </div>
 
-              <label>
-                Preferred location
-                <select name="location" value={form.location} onChange={updateForm}>
-                  <option value="Vacaville">Vacaville Studio</option>
-                  <option value="Davis">Davis Location</option>
-                </select>
-              </label>
+              <div className="field-row">
+                <label>
+                  Emergency contact
+                  <input required name="emergencyContactName" value={form.emergencyContactName} onChange={updateForm} placeholder="First and last name" />
+                </label>
+                <label>
+                  Emergency phone
+                  <input required type="tel" name="emergencyContactPhone" value={form.emergencyContactPhone} onChange={updateForm} placeholder="(000) 000-0000" />
+                </label>
+              </div>
+
+              <div className="field-row">
+                <label>
+                  Lesson length
+                  <select name="lessonLength" value={form.lessonLength} onChange={updateForm}>
+                    {isNewFamily ? (
+                      <>
+                        <option value="30">4 trial lessons, 30 minutes - $200</option>
+                        <option value="45">4 trial lessons, 45 minutes - $290</option>
+                        <option value="60">4 trial lessons, 60 minutes - $380</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="30">30 minutes - $180/month</option>
+                        <option value="45">45 minutes - $270/month</option>
+                        <option value="60">60 minutes - $360/month</option>
+                      </>
+                    )}
+                  </select>
+                </label>
+                <label>
+                  Preferred location
+                  <select name="location" value={form.location} onChange={updateForm}>
+                    <option value="Vacaville">Vacaville Studio</option>
+                    <option value="Davis">Davis Location</option>
+                  </select>
+                </label>
+              </div>
 
               {!isNewFamily && (
                 <section className="time-picker" aria-label="Preferred recurring lesson times">
@@ -815,6 +873,22 @@ export default function Home() {
                   </div>
                 </section>
               )}
+
+              <label>
+                Printed parent or guardian name
+                <input required name="signedName" value={form.signedName} onChange={updateForm} placeholder="Typed signature" />
+              </label>
+
+              <label className="check-row">
+                <input
+                  required
+                  checked={form.policyAcknowledged}
+                  name="policyAcknowledged"
+                  onChange={updateForm}
+                  type="checkbox"
+                />
+                <span>I have read and agree to the studio policy, tuition terms, waiver, and media release information.</span>
+              </label>
 
               <label>
                 Notes
@@ -939,6 +1013,10 @@ export default function Home() {
                           <p>{item.choices}</p>
                           {item.parentName && <p>Parent: {item.parentName}</p>}
                           <p>Email: {item.email}</p>
+                          {item.studentBirthdate && <p>Birthdate: {item.studentBirthdate}</p>}
+                          {item.emergencyContact && <p>Emergency contact: {item.emergencyContact}</p>}
+                          {item.emergencyPhone && <p>Emergency phone: {item.emergencyPhone}</p>}
+                          {item.signedName && <p>Signed by: {item.signedName}</p>}
                           {item.notes && <p>Notes: {item.notes}</p>}
                           <div className="admin-card-actions">
                             {item.table === "registration_requests" && item.status === "pending" && (

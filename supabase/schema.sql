@@ -10,11 +10,16 @@ create table if not exists public.registration_requests (
   parent_name text not null,
   email text not null,
   student_name text not null,
+  student_birthdate date,
+  emergency_contact_name text,
+  emergency_contact_phone text,
   lesson_length integer not null check (lesson_length in (30, 45, 60)),
   location text not null,
   first_choice text,
   second_choice text,
   third_choice text,
+  policy_acknowledged boolean not null default false,
+  signed_name text,
   notes text,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'moved', 'waitlist')),
   source text not null default 'public_registration'
@@ -26,8 +31,13 @@ create table if not exists public.waitlist_entries (
   parent_name text not null,
   email text not null,
   student_name text not null,
+  student_birthdate date,
+  emergency_contact_name text,
+  emergency_contact_phone text,
   lesson_length integer not null check (lesson_length in (30, 45, 60)),
   location text not null,
+  policy_acknowledged boolean not null default false,
+  signed_name text,
   notes text,
   status text not null default 'waiting' check (status in ('waiting', 'invited', 'trial', 'closed'))
 );
@@ -89,6 +99,20 @@ $$;
 insert into public.studio_admins (email)
 values ('moorejacob22@yahoo.com')
 on conflict (email) do nothing;
+
+alter table public.registration_requests
+  add column if not exists student_birthdate date,
+  add column if not exists emergency_contact_name text,
+  add column if not exists emergency_contact_phone text,
+  add column if not exists policy_acknowledged boolean not null default false,
+  add column if not exists signed_name text;
+
+alter table public.waitlist_entries
+  add column if not exists student_birthdate date,
+  add column if not exists emergency_contact_name text,
+  add column if not exists emergency_contact_phone text,
+  add column if not exists policy_acknowledged boolean not null default false,
+  add column if not exists signed_name text;
 
 insert into public.schedule_rules (term, location, day_of_week, start_time, end_time)
 values

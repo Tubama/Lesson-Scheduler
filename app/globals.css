@@ -308,6 +308,30 @@ textarea {
   resize: vertical;
 }
 
+.check-row {
+  align-items: start;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  font-weight: 700;
+  gap: 12px;
+  grid-template-columns: 20px 1fr;
+  line-height: 1.55;
+  padding: 14px;
+}
+
+.check-row input {
+  accent-color: var(--accent);
+  min-height: 20px;
+  padding: 0;
+  width: 20px;
+}
+
+.check-row span {
+  color: var(--muted);
+}
+
 .field-row,
 .choice-grid {
   display: grid;
