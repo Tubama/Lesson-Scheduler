@@ -331,6 +331,29 @@ textarea {
   margin: 0;
 }
 
+.submit-message {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  line-height: 1.55;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.submit-message.success {
+  background: #eef7f2;
+  color: #3f7c5d;
+}
+
+.submit-message.error {
+  background: #fff1e7;
+  color: #9a4f22;
+}
+
+.submit-message.saving {
+  background: #edf4f7;
+  color: #557f95;
+}
+
 .slot-list,
 .admin-list {
   display: grid;

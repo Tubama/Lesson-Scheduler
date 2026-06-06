@@ -15,22 +15,33 @@ A prototype web app for yearly and summer music lesson placement.
 
 ## Run locally
 
-Open `index.html` in a browser, or run a simple local server:
+Install dependencies:
 
 ```bash
-python3 -m http.server 5188
+npm install
+```
+
+Create `.env.local` from `.env.example` and add your Supabase project URL and publishable key.
+
+Run the app:
+
+```bash
+npm run dev
 ```
 
 Then visit:
 
 ```text
-http://localhost:5188
+http://localhost:3000
 ```
+
+## Supabase setup
+
+Run `supabase/schema.sql` in the Supabase SQL editor before testing real form submissions.
 
 ## Planned next steps
 
-- Convert to Next.js when the workflow is approved
-- Add Supabase database and admin login
+- Add admin login
 - Add Google Calendar sync for approved recurring lessons
 - Add email confirmations
 - Deploy through Vercel
