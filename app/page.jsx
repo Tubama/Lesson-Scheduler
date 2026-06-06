@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
-const returningAccessCode = process.env.NEXT_PUBLIC_RETURNING_ACCESS_CODE || "FALL2026";
+const fallbackReturningAccessCode = process.env.NEXT_PUBLIC_RETURNING_ACCESS_CODE || "FALL2026";
 
 const defaultScheduleRules = [
   { id: "default-school-vacaville-monday", term: "school", location: "Vacaville", day_of_week: "Monday", start_time: "15:00", end_time: "20:00", active: true },
@@ -49,6 +49,10 @@ const initialScheduleRule = {
   day_of_week: "Monday",
   start_time: "15:00",
   end_time: "20:00"
+};
+
+const initialAdminSettings = {
+  returningAccessCode: fallbackReturningAccessCode
 };
 
 function minutesFromTime(time) {
@@ -174,6 +178,7 @@ export default function Home() {
   const [scheduleRuleForm, setScheduleRuleForm] = useState(initialScheduleRule);
   const [scheduleMessage, setScheduleMessage] = useState("");
   const [moveSelections, setMoveSelections] = useState({});
+  const [adminSettings, setAdminSettings] = useState(initialAdminSettings);
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
@@ -380,6 +385,11 @@ export default function Home() {
     setScheduleRuleForm((current) => ({ ...current, [name]: value }));
   }
 
+  function updateAdminSettings(event) {
+    const { name, value } = event.target;
+    setAdminSettings((current) => ({ ...current, [name]: value }));
+  }
+
   function selectPreferredTime(label) {
     setForm((current) => {
       const choiceFields = ["firstChoice", "secondChoice", "thirdChoice"];
@@ -492,6 +502,71 @@ export default function Home() {
     }
 
     setScheduleHolds(data || []);
+  }
+
+  async function loadAdminSettings() {
+    if (!supabase || !adminSession) return;
+
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .eq("key", "returning_access_code")
+      .maybeSingle();
+
+    if (error) {
+      setAdminMessage(`Could not load registration settings: ${error.message}`);
+      return;
+    }
+
+    setAdminSettings({
+      returningAccessCode: data?.value || fallbackReturningAccessCode
+    });
+  }
+
+  async function validateReturningAccessCode() {
+    if (!supabase) return false;
+
+    const { data, error } = await supabase.rpc("validate_returning_access_code", {
+      submitted_code: form.accessCode
+    });
+
+    if (error) {
+      return normalizeAccessCode(form.accessCode) === normalizeAccessCode(fallbackReturningAccessCode);
+    }
+
+    return data === true;
+  }
+
+  async function saveAdminSettings(event) {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const nextCode = adminSettings.returningAccessCode.trim();
+
+    if (!nextCode) {
+      setAdminMessage("Enter a returning-family access code before saving.");
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminMessage("Saving registration settings...");
+
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert({
+        key: "returning_access_code",
+        value: nextCode,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      setAdminMessage(`Could not save registration settings: ${error.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    setAdminMessage("Registration settings saved.");
+    setAdminLoading(false);
   }
 
   async function addScheduleRule(event) {
@@ -616,6 +691,7 @@ export default function Home() {
     setWaitlistEntries(waitlistResult.data || []);
     await loadScheduleRules();
     await loadScheduleHolds();
+    await loadAdminSettings();
     setAdminMessage("Requests loaded.");
     setAdminLoading(false);
   }
@@ -666,7 +742,7 @@ export default function Home() {
       return;
     }
 
-    if (!isNewFamily && normalizeAccessCode(form.accessCode) !== normalizeAccessCode(returningAccessCode)) {
+    if (!isNewFamily && !(await validateReturningAccessCode())) {
       setSubmitState({
         status: "error",
         message: "Please enter the current returning-family access code before requesting a lesson time."
@@ -1118,6 +1194,24 @@ export default function Home() {
                       <button className="button secondary" type="button" onClick={signOutAdmin}>Sign out</button>
                     </div>
                   </div>
+                  <form className="admin-settings" onSubmit={saveAdminSettings}>
+                    <div>
+                      <p className="eyebrow">Registration settings</p>
+                      <h3>Returning-family access code</h3>
+                    </div>
+                    <label>
+                      Current code
+                      <input
+                        name="returningAccessCode"
+                        onChange={updateAdminSettings}
+                        placeholder="Example: FALL2026"
+                        value={adminSettings.returningAccessCode}
+                      />
+                    </label>
+                    <button className="button secondary" disabled={adminLoading} type="submit">
+                      Save code
+                    </button>
+                  </form>
                   <div className="admin-toolbar">
                     {["pending", "approved", "trial", "waitlist"].map((status) => (
                       <button

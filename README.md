@@ -4,7 +4,7 @@ A prototype web app for yearly and summer music lesson placement.
 
 ## Current scope
 
-- Returning student registration with configurable access-code gate
+- Returning student registration with admin-managed access-code gate
 - School year and summer schedule modes
 - Location-based availability for Vacaville and Davis
 - 30, 45, and 60 minute lesson choices with displayed prices
@@ -34,7 +34,7 @@ Install dependencies:
 npm install
 ```
 
-Create `.env.local` from `.env.example` and add your Supabase project URL, publishable key, and returning-family access code.
+Create `.env.local` from `.env.example` and add your Supabase project URL and publishable key.
 
 Run the app:
 
@@ -68,9 +68,9 @@ The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user
 
 ## Registration release code
 
-Returning-family requests require the code in `NEXT_PUBLIC_RETURNING_ACCESS_CODE`.
-Change that value in `.env.local` before releasing each school-year or summer schedule.
-If it is not set, the local fallback is `FALL2026`.
+Returning-family requests are checked by the Supabase `validate_returning_access_code` function.
+Signed-in admins can change the current code from the admin dashboard.
+`NEXT_PUBLIC_RETURNING_ACCESS_CODE` is only used as a local fallback before the Supabase setting is installed.
 
 ## Planned next steps
 

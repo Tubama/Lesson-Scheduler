@@ -642,6 +642,23 @@ textarea {
   margin: 0;
 }
 
+.admin-settings {
+  align-items: end;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  margin-bottom: 18px;
+  padding: 14px;
+}
+
+.admin-settings h3,
+.admin-settings p {
+  margin: 0;
+}
+
 .schedule-builder {
   border-top: 1px solid var(--line);
   margin-top: 22px;

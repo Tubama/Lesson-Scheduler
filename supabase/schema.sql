@@ -47,6 +47,12 @@ create table if not exists public.studio_admins (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.schedule_rules (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -100,6 +106,30 @@ insert into public.studio_admins (email)
 values ('moorejacob22@yahoo.com')
 on conflict (email) do nothing;
 
+insert into public.app_settings (key, value)
+values ('returning_access_code', 'FALL2026')
+on conflict (key) do nothing;
+
+create or replace function public.validate_returning_access_code(submitted_code text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored_code text;
+begin
+  select value
+  into stored_code
+  from public.app_settings
+  where key = 'returning_access_code';
+
+  return upper(trim(coalesce(submitted_code, ''))) = upper(trim(coalesce(stored_code, 'FALL2026')));
+end;
+$$;
+
+grant execute on function public.validate_returning_access_code(text) to anon, authenticated;
+
 alter table public.registration_requests
   add column if not exists student_birthdate date,
   add column if not exists emergency_contact_name text,
@@ -127,6 +157,7 @@ on conflict do nothing;
 alter table public.registration_requests enable row level security;
 alter table public.waitlist_entries enable row level security;
 alter table public.studio_admins enable row level security;
+alter table public.app_settings enable row level security;
 alter table public.schedule_rules enable row level security;
 alter table public.schedule_holds enable row level security;
 
@@ -150,6 +181,52 @@ on public.studio_admins
 for select
 to authenticated
 using (email = auth.jwt() ->> 'email');
+
+drop policy if exists "Studio admins can read app settings" on public.app_settings;
+create policy "Studio admins can read app settings"
+on public.app_settings
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
+
+drop policy if exists "Studio admins can create app settings" on public.app_settings;
+create policy "Studio admins can create app settings"
+on public.app_settings
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
+
+drop policy if exists "Studio admins can update app settings" on public.app_settings;
+create policy "Studio admins can update app settings"
+on public.app_settings
+for update
+to authenticated
+using (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
 
 drop policy if exists "Public can read active schedule rules" on public.schedule_rules;
 create policy "Public can read active schedule rules"
