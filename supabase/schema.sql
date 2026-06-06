@@ -1,4 +1,5 @@
 create extension if not exists pgcrypto;
+create extension if not exists btree_gist;
 
 create table if not exists public.registration_requests (
   id uuid primary key default gen_random_uuid(),
@@ -51,6 +52,40 @@ create table if not exists public.schedule_rules (
 create unique index if not exists schedule_rules_unique_block
 on public.schedule_rules (term, location, day_of_week, start_time, end_time, active);
 
+create table if not exists public.schedule_holds (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  request_id uuid references public.registration_requests(id) on delete cascade,
+  term text not null check (term in ('school', 'summer')),
+  location text not null,
+  day_of_week text not null check (day_of_week in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
+  start_minutes integer not null check (start_minutes >= 0 and start_minutes < 1440),
+  end_minutes integer not null check (end_minutes > 0 and end_minutes <= 1440),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'moved', 'waitlist')),
+  active boolean not null default true,
+  check (start_minutes < end_minutes)
+);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'schedule_holds_no_overlap'
+  ) then
+    alter table public.schedule_holds
+    add constraint schedule_holds_no_overlap
+    exclude using gist (
+      term with =,
+      location with =,
+      day_of_week with =,
+      int4range(start_minutes, end_minutes, '[)') with &&
+    )
+    where (active);
+  end if;
+end;
+$$;
+
 insert into public.studio_admins (email)
 values ('moorejacob22@yahoo.com')
 on conflict (email) do nothing;
@@ -69,6 +104,7 @@ alter table public.registration_requests enable row level security;
 alter table public.waitlist_entries enable row level security;
 alter table public.studio_admins enable row level security;
 alter table public.schedule_rules enable row level security;
+alter table public.schedule_holds enable row level security;
 
 drop policy if exists "Public can create registration requests" on public.registration_requests;
 create policy "Public can create registration requests"
@@ -97,6 +133,24 @@ on public.schedule_rules
 for select
 to anon, authenticated
 using (active = true);
+
+drop policy if exists "Public can read active schedule holds" on public.schedule_holds;
+create policy "Public can read active schedule holds"
+on public.schedule_holds
+for select
+to anon, authenticated
+using (active = true);
+
+drop policy if exists "Public can create pending schedule holds" on public.schedule_holds;
+create policy "Public can create pending schedule holds"
+on public.schedule_holds
+for insert
+to anon, authenticated
+with check (
+  active = true
+  and status = 'pending'
+  and start_minutes < end_minutes
+);
 
 drop policy if exists "Studio admins can read all schedule rules" on public.schedule_rules;
 create policy "Studio admins can read all schedule rules"
@@ -150,6 +204,26 @@ on public.schedule_rules
 for delete
 to authenticated
 using (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+);
+
+drop policy if exists "Studio admins can update schedule holds" on public.schedule_holds;
+create policy "Studio admins can update schedule holds"
+on public.schedule_holds
+for update
+to authenticated
+using (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
+)
+with check (
   exists (
     select 1
     from public.studio_admins

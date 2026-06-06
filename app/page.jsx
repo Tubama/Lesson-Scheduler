@@ -49,6 +49,19 @@ function minutesFromTime(time) {
   return hours * 60 + minutes;
 }
 
+function minutesFromDisplayTime(time) {
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const suffix = match[3].toUpperCase();
+
+  if (suffix === "PM" && hours !== 12) hours += 12;
+  if (suffix === "AM" && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+}
+
 function formatTime(minutes) {
   const hours24 = Math.floor(minutes / 60);
   const mins = minutes % 60;
@@ -61,7 +74,35 @@ function slotLabel(slot) {
   return `${slot.day} at ${slot.start} (${slot.length} minutes)`;
 }
 
-function generateSlots(rules, term, location, lessonLength) {
+function parseSlotLabel(label) {
+  const match = label.match(/^(.+) at (.+) \((\d+) minutes\)$/);
+  if (!match) return null;
+
+  const startMinutes = minutesFromDisplayTime(match[2]);
+  const length = Number(match[3]);
+  if (startMinutes === null) return null;
+
+  return {
+    day: match[1],
+    startMinutes,
+    endMinutes: startMinutes + length,
+    length
+  };
+}
+
+function overlaps(slot, hold) {
+  return (
+    hold.active &&
+    ["pending", "approved"].includes(hold.status) &&
+    slot.term === hold.term &&
+    slot.location === hold.location &&
+    slot.day === hold.day_of_week &&
+    slot.startMinutes < hold.end_minutes &&
+    slot.endMinutes > hold.start_minutes
+  );
+}
+
+function generateSlots(rules, holds, term, location, lessonLength) {
   return rules
     .filter((rule) => rule.active !== false && rule.term === term && (!location || rule.location === location))
     .flatMap((rule) => {
@@ -71,11 +112,22 @@ function generateSlots(rules, term, location, lessonLength) {
 
       for (let current = start; current + lessonLength <= end; current += lessonLength) {
         slots.push({
+          term,
           day: rule.day_of_week,
           start: formatTime(current),
+          startMinutes: current,
+          endMinutes: current + lessonLength,
           length: lessonLength,
           location: rule.location,
-          status: "open"
+          status: holds.some((hold) => overlaps({
+            term,
+            day: rule.day_of_week,
+            startMinutes: current,
+            endMinutes: current + lessonLength,
+            location: rule.location
+          }, hold))
+            ? "held"
+            : "open"
         });
       }
 
@@ -106,15 +158,16 @@ export default function Home() {
   const [registrationRequests, setRegistrationRequests] = useState([]);
   const [waitlistEntries, setWaitlistEntries] = useState([]);
   const [scheduleRules, setScheduleRules] = useState(defaultScheduleRules);
+  const [scheduleHolds, setScheduleHolds] = useState([]);
   const [scheduleRuleForm, setScheduleRuleForm] = useState(initialScheduleRule);
   const [scheduleMessage, setScheduleMessage] = useState("");
 
   const filteredSlots = useMemo(() => {
-    return generateSlots(scheduleRules, form.term, form.location, Number(form.lessonLength));
-  }, [scheduleRules, form.term, form.location, form.lessonLength]);
+    return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
+  }, [scheduleRules, scheduleHolds, form.term, form.location, form.lessonLength]);
 
   const openSlots = filteredSlots.filter((slot) => slot.status === "open");
-  const allSlots = generateSlots(scheduleRules, form.term, null, Number(form.lessonLength));
+  const allSlots = generateSlots(scheduleRules, scheduleHolds, form.term, null, Number(form.lessonLength));
   const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
   const pendingCount = registrationRequests.filter((request) => request.status === "pending").length;
   const isNewFamily = form.familyType === "new";
@@ -183,6 +236,7 @@ export default function Home() {
     if (!supabase) return;
 
     loadScheduleRules();
+    loadScheduleHolds();
 
     supabase.auth.getSession().then(({ data }) => {
       setAdminSession(data.session);
@@ -243,6 +297,22 @@ export default function Home() {
 
     setScheduleRules(data?.length ? data : defaultScheduleRules);
     setScheduleMessage(data?.length ? "Schedule loaded." : "Using default schedule. Add rules below to customize it.");
+  }
+
+  async function loadScheduleHolds() {
+    if (!supabase) return;
+
+    const { data, error } = await supabase
+      .from("schedule_holds")
+      .select("id, request_id, term, location, day_of_week, start_minutes, end_minutes, status, active")
+      .eq("active", true);
+
+    if (error) {
+      setScheduleHolds([]);
+      return;
+    }
+
+    setScheduleHolds(data || []);
   }
 
   async function addScheduleRule(event) {
@@ -366,6 +436,7 @@ export default function Home() {
     setRegistrationRequests(registrationsResult.data || []);
     setWaitlistEntries(waitlistResult.data || []);
     await loadScheduleRules();
+    await loadScheduleHolds();
     setAdminMessage("Requests loaded.");
     setAdminLoading(false);
   }
@@ -384,6 +455,14 @@ export default function Home() {
       setAdminMessage(`Could not update request: ${error.message}`);
       setAdminLoading(false);
       return;
+    }
+
+    if (item.table === "registration_requests") {
+      const holdActive = ["pending", "approved"].includes(nextStatus);
+      await supabase
+        .from("schedule_holds")
+        .update({ status: nextStatus, active: holdActive })
+        .eq("request_id", item.id);
     }
 
     await loadAdminData();
@@ -417,9 +496,11 @@ export default function Home() {
       notes: form.notes || null
     };
 
+    const requestId = crypto.randomUUID();
     const table = isNewFamily ? "waitlist_entries" : "registration_requests";
     const insertPayload = isNewFamily
       ? {
+          id: requestId,
           parent_name: payload.parent_name,
           email: payload.email,
           student_name: payload.student_name,
@@ -428,6 +509,9 @@ export default function Home() {
           notes: payload.notes
         }
       : payload;
+    if (!isNewFamily) {
+      insertPayload.id = requestId;
+    }
 
     const { error } = await supabase.from(table).insert(insertPayload);
 
@@ -439,6 +523,32 @@ export default function Home() {
       return;
     }
 
+    if (!isNewFamily && form.firstChoice) {
+      const parsedFirstChoice = parseSlotLabel(form.firstChoice);
+
+      if (parsedFirstChoice) {
+        const { error: holdError } = await supabase.from("schedule_holds").insert({
+          request_id: requestId,
+          term: form.term,
+          location: form.location,
+          day_of_week: parsedFirstChoice.day,
+          start_minutes: parsedFirstChoice.startMinutes,
+          end_minutes: parsedFirstChoice.endMinutes,
+          status: "pending",
+          active: true
+        });
+
+        if (holdError) {
+          setSubmitState({
+            status: "error",
+            message: `Request saved, but that time could not be held because it may overlap another request: ${holdError.message}`
+          });
+          await loadScheduleHolds();
+          return;
+        }
+      }
+    }
+
     setSubmitState({
       status: "success",
       message: isNewFamily
@@ -446,6 +556,7 @@ export default function Home() {
         : "Registration request saved as pending for teacher approval."
     });
     setForm(initialForm);
+    await loadScheduleHolds();
   }
 
   return (
@@ -634,7 +745,7 @@ export default function Home() {
                     <div className={`slot ${slot.status === "held" ? "held" : ""}`} key={slotLabel(slot)}>
                       <strong>{slotLabel(slot)}</strong>
                       <span className="slot-meta">
-                        Available to request
+                        {slot.status === "held" ? "Held pending approval" : "Available to request"}
                       </span>
                     </div>
                   ))

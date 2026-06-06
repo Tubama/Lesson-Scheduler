@@ -54,8 +54,10 @@ The schema adds:
 - `waitlist_entries`
 - `studio_admins`
 - `schedule_rules`
+- `schedule_holds`
 - Row level security policies for public inserts
 - Public schedule-rule reads
+- Public privacy-safe hold reads
 - Authenticated admin read/update policies
 
 The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user with that email, or update `studio_admins` to match the email you want to use for admin login.
@@ -63,6 +65,7 @@ The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user
 ## Planned next steps
 
 - Prevent duplicate pending requests for the same recurring time
+- Create admin tools for moving a request to a different generated start time
 - Add Google Calendar sync for approved recurring lessons
 - Add email confirmations
 - Deploy through Vercel
