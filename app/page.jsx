@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
+const returningAccessCode = process.env.NEXT_PUBLIC_RETURNING_ACCESS_CODE || "FALL2026";
+
 const defaultScheduleRules = [
   { id: "default-school-vacaville-monday", term: "school", location: "Vacaville", day_of_week: "Monday", start_time: "15:00", end_time: "20:00", active: true },
   { id: "default-school-vacaville-wednesday", term: "school", location: "Vacaville", day_of_week: "Wednesday", start_time: "15:00", end_time: "20:00", active: true },
@@ -93,6 +95,10 @@ function parseSlotLabel(label) {
     endMinutes: startMinutes + length,
     length
   };
+}
+
+function normalizeAccessCode(code) {
+  return code.trim().toUpperCase();
 }
 
 function overlaps(slot, hold) {
@@ -660,6 +666,14 @@ export default function Home() {
       return;
     }
 
+    if (!isNewFamily && normalizeAccessCode(form.accessCode) !== normalizeAccessCode(returningAccessCode)) {
+      setSubmitState({
+        status: "error",
+        message: "Please enter the current returning-family access code before requesting a lesson time."
+      });
+      return;
+    }
+
     if (!isNewFamily && !form.firstChoice) {
       setSubmitState({
         status: "error",
@@ -848,7 +862,7 @@ export default function Home() {
               {!isNewFamily && (
                 <label>
                   Returning family access code
-                  <input name="accessCode" value={form.accessCode} onChange={updateForm} placeholder="Example: FALL2026" />
+                  <input required name="accessCode" value={form.accessCode} onChange={updateForm} placeholder="Enter the code you received" />
                 </label>
               )}
 
