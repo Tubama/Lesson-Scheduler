@@ -110,6 +110,10 @@ insert into public.app_settings (key, value)
 values ('returning_access_code', 'FALL2026')
 on conflict (key) do nothing;
 
+insert into public.app_settings (key, value)
+values ('registration_open', 'true')
+on conflict (key) do nothing;
+
 create or replace function public.validate_returning_access_code(submitted_code text)
 returns boolean
 language plpgsql
@@ -129,6 +133,26 @@ end;
 $$;
 
 grant execute on function public.validate_returning_access_code(text) to anon, authenticated;
+
+create or replace function public.is_registration_open()
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored_value text;
+begin
+  select value
+  into stored_value
+  from public.app_settings
+  where key = 'registration_open';
+
+  return lower(trim(coalesce(stored_value, 'true'))) = 'true';
+end;
+$$;
+
+grant execute on function public.is_registration_open() to anon, authenticated;
 
 alter table public.registration_requests
   add column if not exists student_birthdate date,

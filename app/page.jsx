@@ -52,7 +52,8 @@ const initialScheduleRule = {
 };
 
 const initialAdminSettings = {
-  returningAccessCode: fallbackReturningAccessCode
+  returningAccessCode: fallbackReturningAccessCode,
+  registrationOpen: true
 };
 
 function minutesFromTime(time) {
@@ -183,6 +184,7 @@ export default function Home() {
   const [scheduleMessage, setScheduleMessage] = useState("");
   const [moveSelections, setMoveSelections] = useState({});
   const [adminSettings, setAdminSettings] = useState(initialAdminSettings);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
@@ -343,6 +345,7 @@ export default function Home() {
 
     loadScheduleRules();
     loadScheduleHolds();
+    loadRegistrationStatus();
 
     supabase.auth.getSession().then(({ data }) => {
       setAdminSession(data.session);
@@ -396,8 +399,8 @@ export default function Home() {
   }
 
   function updateAdminSettings(event) {
-    const { name, value } = event.target;
-    setAdminSettings((current) => ({ ...current, [name]: value }));
+    const { checked, name, type, value } = event.target;
+    setAdminSettings((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
   }
 
   function selectPreferredTime(label) {
@@ -514,23 +517,37 @@ export default function Home() {
     setScheduleHolds(data || []);
   }
 
+  async function loadRegistrationStatus() {
+    if (!supabase) return;
+
+    const { data, error } = await supabase.rpc("is_registration_open");
+
+    if (!error) {
+      setRegistrationOpen(data !== false);
+    }
+  }
+
   async function loadAdminSettings() {
     if (!supabase || !adminSession) return;
 
     const { data, error } = await supabase
       .from("app_settings")
       .select("key, value")
-      .eq("key", "returning_access_code")
-      .maybeSingle();
+      .in("key", ["returning_access_code", "registration_open"]);
 
     if (error) {
       setAdminMessage(`Could not load registration settings: ${error.message}`);
       return;
     }
 
+    const settings = Object.fromEntries((data || []).map((item) => [item.key, item.value]));
+    const nextRegistrationOpen = settings.registration_open !== "false";
+
     setAdminSettings({
-      returningAccessCode: data?.value || fallbackReturningAccessCode
+      returningAccessCode: settings.returning_access_code || fallbackReturningAccessCode,
+      registrationOpen: nextRegistrationOpen
     });
+    setRegistrationOpen(nextRegistrationOpen);
   }
 
   async function validateReturningAccessCode() {
@@ -547,11 +564,23 @@ export default function Home() {
     return data === true;
   }
 
+  async function checkRegistrationOpen() {
+    if (!supabase) return true;
+
+    const { data, error } = await supabase.rpc("is_registration_open");
+
+    if (error) return registrationOpen;
+
+    setRegistrationOpen(data !== false);
+    return data !== false;
+  }
+
   async function saveAdminSettings(event) {
     event.preventDefault();
     if (!supabase) return;
 
     const nextCode = adminSettings.returningAccessCode.trim();
+    const nextRegistrationOpen = Boolean(adminSettings.registrationOpen);
 
     if (!nextCode) {
       setAdminMessage("Enter a returning-family access code before saving.");
@@ -563,11 +592,18 @@ export default function Home() {
 
     const { error } = await supabase
       .from("app_settings")
-      .upsert({
-        key: "returning_access_code",
-        value: nextCode,
-        updated_at: new Date().toISOString()
-      });
+      .upsert([
+        {
+          key: "returning_access_code",
+          value: nextCode,
+          updated_at: new Date().toISOString()
+        },
+        {
+          key: "registration_open",
+          value: String(nextRegistrationOpen),
+          updated_at: new Date().toISOString()
+        }
+      ]);
 
     if (error) {
       setAdminMessage(`Could not save registration settings: ${error.message}`);
@@ -575,6 +611,7 @@ export default function Home() {
       return;
     }
 
+    setRegistrationOpen(nextRegistrationOpen);
     setAdminMessage("Registration settings saved.");
     setAdminLoading(false);
   }
@@ -800,6 +837,14 @@ export default function Home() {
       return;
     }
 
+    if (!(await checkRegistrationOpen())) {
+      setSubmitState({
+        status: "error",
+        message: "Registration is currently closed. Please contact the studio if you need help."
+      });
+      return;
+    }
+
     if (!isNewFamily && !(await validateReturningAccessCode())) {
       setSubmitState({
         status: "error",
@@ -976,6 +1021,12 @@ export default function Home() {
 
           <div className="workspace-grid">
             <form className="scheduler-card" onSubmit={submitRequest}>
+              {!registrationOpen && (
+                <p className="submit-message error">
+                  Registration is currently closed. Please contact the studio if you need help.
+                </p>
+              )}
+
               <div className="field-row">
                 <label>
                   Schedule
@@ -1169,8 +1220,8 @@ export default function Home() {
                     ? "New families join the waitlist first. Trial lessons are offered only when a regular spot opens."
                     : "Returning family requests are held as pending until teacher approval."}
                 </p>
-                <button className="button primary" type="submit" disabled={submitState.status === "saving"}>
-                  {submitState.status === "saving" ? "Saving..." : "Submit request"}
+                <button className="button primary" type="submit" disabled={submitState.status === "saving" || !registrationOpen}>
+                  {submitState.status === "saving" ? "Saving..." : registrationOpen ? "Submit request" : "Registration closed"}
                 </button>
               </div>
               {submitState.message && (
@@ -1265,6 +1316,15 @@ export default function Home() {
                         placeholder="Example: FALL2026"
                         value={adminSettings.returningAccessCode}
                       />
+                    </label>
+                    <label className="settings-toggle">
+                      <input
+                        checked={adminSettings.registrationOpen}
+                        name="registrationOpen"
+                        onChange={updateAdminSettings}
+                        type="checkbox"
+                      />
+                      <span>Registration open</span>
                     </label>
                     <button className="button secondary" disabled={adminLoading} type="submit">
                       Save code

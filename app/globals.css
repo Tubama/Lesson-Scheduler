@@ -649,7 +649,7 @@ textarea {
   border-radius: 8px;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, auto) auto;
   margin-bottom: 18px;
   padding: 14px;
 }
@@ -657,6 +657,24 @@ textarea {
 .admin-settings h3,
 .admin-settings p {
   margin: 0;
+}
+
+.settings-toggle {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.settings-toggle input {
+  accent-color: var(--accent);
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
 }
 
 .schedule-builder {

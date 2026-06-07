@@ -5,6 +5,7 @@ A prototype web app for yearly and summer music lesson placement.
 ## Current scope
 
 - Returning student registration with admin-managed access-code gate
+- Admin-managed registration open/closed switch
 - School year and summer schedule modes
 - Location-based availability for Vacaville and Davis
 - 30, 45, and 60 minute lesson choices with displayed prices
@@ -70,7 +71,7 @@ The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user
 ## Registration release code
 
 Returning-family requests are checked by the Supabase `validate_returning_access_code` function.
-Signed-in admins can change the current code from the admin dashboard.
+Signed-in admins can change the current code and open or close registration from the admin dashboard.
 `NEXT_PUBLIC_RETURNING_ACCESS_CODE` is only used as a local fallback before the Supabase setting is installed.
 
 ## Planned next steps
