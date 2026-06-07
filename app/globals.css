@@ -154,12 +154,14 @@ textarea {
   align-items: center;
   border: 1px solid transparent;
   border-radius: 8px;
+  color: inherit;
   cursor: pointer;
   display: inline-flex;
   font-weight: 800;
   justify-content: center;
   min-height: 44px;
   padding: 12px 18px;
+  text-decoration: none;
 }
 
 .button.primary {

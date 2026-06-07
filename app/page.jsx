@@ -110,6 +110,33 @@ function csvValue(value) {
   return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
 }
 
+function mailtoForItem(item) {
+  const studentName = item.name || "your student";
+  const choices = item.choices && item.choices !== "No choices selected." ? `\n\nRequested time details:\n${item.choices}` : "";
+  const greeting = item.parentName ? `Hi ${item.parentName},` : "Hi,";
+  const subjectByStatus = {
+    pending: `Mia's Music Studio registration request for ${studentName}`,
+    approved: `Mia's Music Studio lesson time approved for ${studentName}`,
+    rejected: `Mia's Music Studio registration update for ${studentName}`,
+    waitlist: `Mia's Music Studio waitlist update for ${studentName}`,
+    waiting: `Mia's Music Studio waitlist request for ${studentName}`,
+    invited: `Mia's Music Studio trial lesson invitation for ${studentName}`,
+    trial: `Mia's Music Studio trial lessons for ${studentName}`,
+    closed: `Mia's Music Studio waitlist update for ${studentName}`
+  };
+  const bodyByStatus = {
+    pending: `${greeting}\n\nThank you for submitting a lesson registration request for ${studentName}. I received your request and will review the schedule before confirming final placements.${choices}\n\nThank you,\nMia's Music Studio`,
+    approved: `${greeting}\n\n${studentName}'s recurring lesson time has been approved.${choices}\n\nThank you,\nMia's Music Studio`,
+    waitlist: `${greeting}\n\nThank you for your registration request for ${studentName}. At this time I am moving the request to the waitlist and will follow up if a suitable spot opens.${choices}\n\nThank you,\nMia's Music Studio`,
+    invited: `${greeting}\n\nA lesson time may be available for ${studentName}, and I would like to invite you to begin the 4-lesson trial process.\n\nPlease reply to confirm whether you would like to move forward.\n\nThank you,\nMia's Music Studio`,
+    trial: `${greeting}\n\nThis is a note about ${studentName}'s 4-lesson trial block. Please reply if you have any questions.\n\nThank you,\nMia's Music Studio`
+  };
+  const subject = subjectByStatus[item.status] || `Mia's Music Studio update for ${studentName}`;
+  const body = bodyByStatus[item.status] || `${greeting}\n\nI am following up about ${studentName}'s lesson registration.${choices}\n\nThank you,\nMia's Music Studio`;
+
+  return `mailto:${encodeURIComponent(item.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function overlaps(slot, hold) {
   return (
     hold.active &&
@@ -1451,6 +1478,9 @@ export default function Home() {
                               </div>
                             )}
                             <div className="admin-card-actions">
+                              <a className="button secondary" href={mailtoForItem(item)}>
+                                Email parent
+                              </a>
                               {item.table === "registration_requests" && item.status === "pending" && (
                                 <>
                                   <button className="button secondary" type="button" onClick={() => updateRequestStatus(item, "approved")}>Approve</button>
