@@ -12,6 +12,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Student birthdate and emergency contact collection
 - Studio policy acknowledgment with typed parent/guardian name
 - First, second, and third choice requests
+- Duplicate active request prevention for the same student and email
 - Pending approval workflow preview
 - New student waitlist and 4-lesson trial process
 - Admin sign-in for reading and updating real Supabase requests
@@ -76,7 +77,6 @@ Signed-in admins can change the current code and open or close registration from
 
 ## Planned next steps
 
-- Prevent duplicate pending requests for the same recurring time
 - Add Google Calendar sync for approved recurring lessons
 - Add email confirmations
 - Deploy through Vercel

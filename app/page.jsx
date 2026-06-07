@@ -575,6 +575,21 @@ export default function Home() {
     return data !== false;
   }
 
+  async function hasDuplicateRequest() {
+    if (!supabase) return false;
+
+    const { data, error } = await supabase.rpc("has_active_student_request", {
+      submitted_email: form.email,
+      submitted_student_name: form.studentName,
+      submitted_term: form.term,
+      submitted_family_type: form.familyType
+    });
+
+    if (error) return false;
+
+    return data === true;
+  }
+
   async function saveAdminSettings(event) {
     event.preventDefault();
     if (!supabase) return;
@@ -857,6 +872,16 @@ export default function Home() {
       setSubmitState({
         status: "error",
         message: "Please choose at least a first-choice lesson time."
+      });
+      return;
+    }
+
+    if (await hasDuplicateRequest()) {
+      setSubmitState({
+        status: "error",
+        message: isNewFamily
+          ? "This student already has an active waitlist request for this schedule."
+          : "This student already has an active registration request for this schedule."
       });
       return;
     }

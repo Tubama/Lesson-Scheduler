@@ -154,6 +154,41 @@ $$;
 
 grant execute on function public.is_registration_open() to anon, authenticated;
 
+create or replace function public.has_active_student_request(
+  submitted_email text,
+  submitted_student_name text,
+  submitted_term text,
+  submitted_family_type text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if submitted_family_type = 'new' then
+    return exists (
+      select 1
+      from public.waitlist_entries
+      where lower(trim(email)) = lower(trim(coalesce(submitted_email, '')))
+        and lower(trim(student_name)) = lower(trim(coalesce(submitted_student_name, '')))
+        and status in ('waiting', 'invited', 'trial')
+    );
+  end if;
+
+  return exists (
+    select 1
+    from public.registration_requests
+    where lower(trim(email)) = lower(trim(coalesce(submitted_email, '')))
+      and lower(trim(student_name)) = lower(trim(coalesce(submitted_student_name, '')))
+      and term = submitted_term
+      and status in ('pending', 'approved', 'moved', 'waitlist')
+  );
+end;
+$$;
+
+grant execute on function public.has_active_student_request(text, text, text, text) to anon, authenticated;
+
 alter table public.registration_requests
   add column if not exists student_birthdate date,
   add column if not exists emergency_contact_name text,
