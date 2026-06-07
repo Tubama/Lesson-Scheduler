@@ -110,6 +110,15 @@ function csvValue(value) {
   return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function downloadCsv(filename, headers, rows) {
   const csv = [headers, ...rows]
     .map((row) => row.map(csvValue).join(","))
@@ -1539,6 +1548,7 @@ export default function Home() {
                           <article className="admin-card" key={`${item.table}-${item.id}`}>
                             <span className={`status-pill status-${item.status}`}>{item.status}</span>
                             <h3>{item.name}</h3>
+                            {item.createdAt && <p className="card-meta">Submitted {formatDateTime(item.createdAt)}</p>}
                             <p>{item.details}</p>
                             <p>{item.choices}</p>
                             {item.parentName && <p>Parent: {item.parentName}</p>}

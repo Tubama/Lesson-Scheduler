@@ -852,6 +852,13 @@ textarea {
   margin: 0 0 12px;
 }
 
+.admin-card .card-meta {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin-top: -2px;
+}
+
 .move-tool {
   align-items: end;
   border-top: 1px solid var(--line);
