@@ -224,14 +224,14 @@ drop policy if exists "Public can create registration requests" on public.regist
 create policy "Public can create registration requests"
 on public.registration_requests
 for insert
-to anon
+to anon, authenticated
 with check (true);
 
 drop policy if exists "Public can join waitlist" on public.waitlist_entries;
 create policy "Public can join waitlist"
 on public.waitlist_entries
 for insert
-to anon
+to anon, authenticated
 with check (true);
 
 drop policy if exists "Studio admins can read admin list" on public.studio_admins;
