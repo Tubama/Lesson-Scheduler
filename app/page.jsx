@@ -827,7 +827,12 @@ export default function Home() {
     setAdminLoading(false);
   }
 
-  async function deleteScheduleRule(ruleId) {
+  async function deleteScheduleRule(rule) {
+    const ruleLabel = `${rule.location} ${rule.term === "school" ? "school year" : "summer"} ${rule.day_of_week}, ${formatTime(minutesFromTime(rule.start_time))} to ${formatTime(minutesFromTime(rule.end_time))}`;
+    const confirmed = window.confirm(`Remove this teaching block?\n\n${ruleLabel}\n\nParent availability will update immediately.`);
+
+    if (!confirmed) return;
+
     setAdminLoading(true);
     setScheduleMessage("Removing schedule rule...");
 
@@ -840,7 +845,7 @@ export default function Home() {
     const { error } = await supabase
       .from("schedule_rules")
       .delete()
-      .eq("id", ruleId);
+      .eq("id", rule.id);
 
     if (error) {
       setScheduleMessage(`Could not remove schedule rule: ${error.message}`);
@@ -1666,7 +1671,7 @@ export default function Home() {
                         <small>{formatTime(minutesFromTime(rule.start_time))} to {formatTime(minutesFromTime(rule.end_time))}</small>
                     </div>
                     {adminSession && !String(rule.id).startsWith("default-") && (
-                      <button className="text-button" type="button" onClick={() => deleteScheduleRule(rule.id)}>Remove</button>
+                      <button className="text-button" type="button" onClick={() => deleteScheduleRule(rule)}>Remove</button>
                     )}
                   </article>
                 ))}

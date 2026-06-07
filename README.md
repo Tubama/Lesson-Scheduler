@@ -25,6 +25,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Admin email draft links for parent follow-up
 - Admin schedule builder for recurring weekly teaching blocks
 - Admin move tool for rearranging pending or approved recurring times
+- Confirmation before deleting custom teaching blocks
 
 ## Scheduling model
 
