@@ -806,19 +806,34 @@ textarea {
 }
 
 .tab-button {
+  align-items: center;
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
   font-weight: 800;
   min-height: 38px;
   padding: 8px 12px;
+}
+
+.tab-button strong {
+  background: rgba(122, 154, 174, 0.16);
+  border-radius: 999px;
+  min-width: 24px;
+  padding: 2px 7px;
+  text-align: center;
 }
 
 .tab-button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
+}
+
+.tab-button.active strong {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .admin-card {

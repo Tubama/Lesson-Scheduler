@@ -358,6 +358,13 @@ export default function Home() {
     ].some((value) => String(value || "").toLowerCase().includes(query)));
   }, [adminCards, adminSearch]);
 
+  const adminCounts = useMemo(() => ({
+    pending: registrationRequests.filter((item) => item.status === "pending").length,
+    approved: registrationRequests.filter((item) => item.status === "approved").length,
+    trial: waitlistEntries.filter((item) => item.status === "trial").length,
+    waitlist: registrationRequests.filter((item) => item.status === "waitlist").length + waitlistEntries.length
+  }), [registrationRequests, waitlistEntries]);
+
   const approvedScheduleRows = useMemo(() => {
     return registrationRequests
       .filter((request) => request.status === "approved" && request.first_choice)
@@ -1461,7 +1468,8 @@ export default function Home() {
                         onClick={() => setAdminFilter(status)}
                         type="button"
                       >
-                        {status === "trial" ? "Trials" : status[0].toUpperCase() + status.slice(1)}
+                        <span>{status === "trial" ? "Trials" : status[0].toUpperCase() + status.slice(1)}</span>
+                        <strong>{adminCounts[status]}</strong>
                       </button>
                     ))}
                     <label className="admin-search">
