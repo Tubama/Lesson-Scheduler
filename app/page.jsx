@@ -17,6 +17,7 @@ const defaultScheduleRules = [
 ];
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const slotStartIntervalMinutes = 15;
 
 const initialForm = {
   term: "school",
@@ -180,7 +181,7 @@ function generateSlots(rules, holds, term, location, lessonLength) {
       const end = minutesFromTime(rule.end_time);
       const slots = [];
 
-      for (let current = start; current + lessonLength <= end; current += lessonLength) {
+      for (let current = start; current + lessonLength <= end; current += slotStartIntervalMinutes) {
         slots.push({
           term,
           day: rule.day_of_week,

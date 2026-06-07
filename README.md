@@ -29,11 +29,11 @@ A prototype web app for yearly and summer music lesson placement.
 
 ## Scheduling model
 
-The app stores teaching blocks, not fixed lesson slots. Parent start-time options are generated from the selected lesson length:
+The app stores teaching blocks, not fixed lesson slots. Parent start-time options are generated on a 15-minute grid and filtered by the selected lesson length:
 
-- 30-minute lessons generate 30-minute start intervals
-- 45-minute lessons generate 45-minute start intervals
-- 60-minute lessons generate hourly start intervals
+- 30-minute lessons can shift into 15-minute openings around existing holds
+- 45-minute lessons can start on compatible 15-minute boundaries
+- 60-minute lessons can shift when shorter or longer held lessons create openings
 
 ## Run locally
 
