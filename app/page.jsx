@@ -212,6 +212,7 @@ export default function Home() {
   const [moveSelections, setMoveSelections] = useState({});
   const [adminSettings, setAdminSettings] = useState(initialAdminSettings);
   const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [adminSearch, setAdminSearch] = useState("");
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
@@ -266,9 +267,13 @@ export default function Home() {
           details: `${item.parent_name} requested the waitlist for ${item.location}, ${item.lesson_length} minutes.`,
           choices: item.notes || "No notes provided.",
           email: item.email,
+          parentName: item.parent_name,
+          lessonLength: item.lesson_length,
+          location: item.location,
           studentBirthdate: item.student_birthdate,
           emergencyContact: item.emergency_contact_name,
           emergencyPhone: item.emergency_contact_phone,
+          notes: item.notes,
           signedName: item.signed_name,
           createdAt: item.created_at
         }))
@@ -286,9 +291,13 @@ export default function Home() {
           details: `${item.parent_name} is in a 4-lesson trial for ${item.location}, ${item.lesson_length} minutes.`,
           choices: item.notes || "No notes provided.",
           email: item.email,
+          parentName: item.parent_name,
+          lessonLength: item.lesson_length,
+          location: item.location,
           studentBirthdate: item.student_birthdate,
           emergencyContact: item.emergency_contact_name,
           emergencyPhone: item.emergency_contact_phone,
+          notes: item.notes,
           signedName: item.signed_name,
           createdAt: item.created_at
         }));
@@ -316,6 +325,24 @@ export default function Home() {
         createdAt: item.created_at
       }));
   }, [adminFilter, registrationRequests, waitlistEntries]);
+
+  const visibleAdminCards = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return adminCards;
+
+    return adminCards.filter((item) => [
+      item.name,
+      item.parentName,
+      item.email,
+      item.location,
+      item.status,
+      item.details,
+      item.choices,
+      item.notes,
+      item.emergencyContact,
+      item.emergencyPhone
+    ].some((value) => String(value || "").toLowerCase().includes(query)));
+  }, [adminCards, adminSearch]);
 
   const approvedScheduleRows = useMemo(() => {
     return registrationRequests
@@ -1393,6 +1420,14 @@ export default function Home() {
                         {status === "trial" ? "Trials" : status[0].toUpperCase() + status.slice(1)}
                       </button>
                     ))}
+                    <label className="admin-search">
+                      <span>Search requests</span>
+                      <input
+                        onChange={(event) => setAdminSearch(event.target.value)}
+                        placeholder="Student, parent, email, notes"
+                        value={adminSearch}
+                      />
+                    </label>
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
                   <section className="approved-schedule">
@@ -1436,8 +1471,8 @@ export default function Home() {
                     )}
                   </section>
                   <div className="admin-list">
-                    {adminCards.length ? (
-                      adminCards.map((item) => {
+                    {visibleAdminCards.length ? (
+                      visibleAdminCards.map((item) => {
                         const moveOptions = moveOptionsFor(item);
 
                         return (
@@ -1501,8 +1536,8 @@ export default function Home() {
                       })
                     ) : (
                       <div className="empty-state">
-                        <strong>No {adminFilter} requests yet.</strong>
-                        <span>New submissions will appear here after parents use the registration form.</span>
+                        <strong>No matching {adminFilter} requests.</strong>
+                        <span>{adminSearch ? "Try a different search term." : "New submissions will appear here after parents use the registration form."}</span>
                       </div>
                     )}
                   </div>

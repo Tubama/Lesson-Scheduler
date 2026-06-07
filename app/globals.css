@@ -582,10 +582,27 @@ textarea {
 }
 
 .admin-toolbar {
+  align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 18px;
+}
+
+.admin-search {
+  flex: 1 1 260px;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 220px;
+}
+
+.admin-search span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.admin-search input {
+  min-height: 38px;
 }
 
 .admin-login {

@@ -16,6 +16,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Pending approval workflow preview
 - New student waitlist and 4-lesson trial process
 - Admin sign-in for reading and updating real Supabase requests
+- Admin search across student, parent, email, notes, and request details
 - Approved schedule summary grouped by term, location, day, and time
 - CSV export for approved recurring placements
 - Admin email draft links for parent follow-up
