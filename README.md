@@ -19,6 +19,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Admin search across student, parent, email, notes, and request details
 - Approved schedule summary grouped by term, location, day, and time
 - CSV export for approved recurring placements
+- CSV export for visible admin request lists
 - Admin email draft links for parent follow-up
 - Admin schedule builder for recurring weekly teaching blocks
 - Admin move tool for rearranging pending or approved recurring times

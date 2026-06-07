@@ -110,6 +110,20 @@ function csvValue(value) {
   return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
 }
 
+function downloadCsv(filename, headers, rows) {
+  const csv = [headers, ...rows]
+    .map((row) => row.map(csvValue).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function mailtoForItem(item) {
   const studentName = item.name || "your student";
   const choices = item.choices && item.choices !== "No choices selected." ? `\n\nRequested time details:\n${item.choices}` : "";
@@ -719,18 +733,48 @@ export default function Home() {
       row.thirdChoice,
       row.notes
     ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvValue).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
 
-    link.href = url;
-    link.download = `approved-schedule-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`approved-schedule-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
     setAdminMessage("Approved schedule CSV downloaded.");
+  }
+
+  function downloadVisibleRequests() {
+    if (!visibleAdminCards.length) {
+      setAdminMessage("There are no visible requests to export.");
+      return;
+    }
+
+    const headers = [
+      "Status",
+      "Student",
+      "Parent",
+      "Email",
+      "Location",
+      "Lesson length",
+      "Choices or notes",
+      "Birthdate",
+      "Emergency contact",
+      "Emergency phone",
+      "Signed by",
+      "Created"
+    ];
+    const rows = visibleAdminCards.map((item) => [
+      item.status,
+      item.name,
+      item.parentName,
+      item.email,
+      item.location,
+      item.lessonLength ? `${item.lessonLength} minutes` : "",
+      item.choices,
+      item.studentBirthdate,
+      item.emergencyContact,
+      item.emergencyPhone,
+      item.signedName,
+      item.createdAt
+    ]);
+
+    downloadCsv(`${adminFilter}-requests-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    setAdminMessage("Visible requests CSV downloaded.");
   }
 
   async function addScheduleRule(event) {
@@ -1428,6 +1472,14 @@ export default function Home() {
                         value={adminSearch}
                       />
                     </label>
+                    <button
+                      className="button secondary toolbar-button"
+                      disabled={!visibleAdminCards.length}
+                      onClick={downloadVisibleRequests}
+                      type="button"
+                    >
+                      Export visible
+                    </button>
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
                   <section className="approved-schedule">

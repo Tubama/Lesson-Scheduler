@@ -605,6 +605,11 @@ textarea {
   min-height: 38px;
 }
 
+.toolbar-button {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
 .admin-login {
   display: grid;
   gap: 18px;
