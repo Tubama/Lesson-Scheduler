@@ -505,6 +505,85 @@ export default function Home() {
     }, []);
   }, [scheduleActivityRows]);
 
+  const scheduleConflictGroups = useMemo(() => {
+    const pendingRows = registrationRequests
+      .filter((request) => request.status === "pending" && request.first_choice)
+      .map((request) => {
+        const parsedChoice = parseSlotLabel(request.first_choice);
+        if (!parsedChoice) return null;
+
+        return {
+          id: request.id,
+          term: request.term,
+          location: request.location,
+          day: parsedChoice.day,
+          startMinutes: parsedChoice.startMinutes,
+          endMinutes: parsedChoice.endMinutes,
+          timeRange: `${formatTime(parsedChoice.startMinutes)}-${formatTime(parsedChoice.endMinutes)}`,
+          studentName: request.student_name,
+          status: request.status
+        };
+      })
+      .filter(Boolean);
+    const approvedRows = approvedScheduleRows.map((row) => ({
+      ...row,
+      endMinutes: row.startMinutes + Number(row.lessonLength || 0),
+      timeRange: `${formatTime(row.startMinutes)}-${formatTime(row.startMinutes + Number(row.lessonLength || 0))}`
+    }));
+    const scheduledRows = [...approvedRows, ...pendingRows]
+      .sort((a, b) => {
+        const termCompare = a.term.localeCompare(b.term);
+        if (termCompare) return termCompare;
+        const locationCompare = a.location.localeCompare(b.location);
+        if (locationCompare) return locationCompare;
+        const dayCompare = weekdays.indexOf(a.day) - weekdays.indexOf(b.day);
+        if (dayCompare) return dayCompare;
+        return a.startMinutes - b.startMinutes;
+      });
+
+    const conflictMap = new Map();
+
+    scheduledRows.forEach((row, index) => {
+      scheduledRows.slice(index + 1).forEach((otherRow) => {
+        const sameBlock = row.term === otherRow.term && row.location === otherRow.location && row.day === otherRow.day;
+        const overlapsTime = row.startMinutes < otherRow.endMinutes && otherRow.startMinutes < row.endMinutes;
+        if (!sameBlock || !overlapsTime) return;
+
+        const title = `${row.term === "summer" ? "Summer" : "School year"} · ${row.location} · ${row.day}`;
+        const conflict = `${row.studentName} (${row.timeRange}, ${row.status}) overlaps ${otherRow.studentName} (${otherRow.timeRange}, ${otherRow.status})`;
+        conflictMap.set(title, [...(conflictMap.get(title) || []), conflict]);
+      });
+    });
+
+    return Array.from(conflictMap, ([title, conflicts]) => ({ title, conflicts }));
+  }, [approvedScheduleRows, registrationRequests]);
+
+  const scheduleHealthIssues = useMemo(() => {
+    return registrationRequests
+      .filter((request) => ["pending", "approved"].includes(request.status))
+      .map((request) => {
+        const parsedChoice = parseSlotLabel(request.first_choice || "");
+        if (!parsedChoice) {
+          return `${request.student_name} is ${request.status} but does not have a valid first-choice time.`;
+        }
+
+        const matchingHold = scheduleHolds.find((hold) => (
+          hold.request_id === request.id &&
+          hold.active &&
+          hold.term === request.term &&
+          hold.location === request.location &&
+          hold.day_of_week === parsedChoice.day &&
+          hold.start_minutes === parsedChoice.startMinutes &&
+          hold.end_minutes === parsedChoice.endMinutes
+        ));
+
+        if (matchingHold) return null;
+
+        return `${request.student_name} is ${request.status} for ${request.location} ${parsedChoice.day} at ${formatTime(parsedChoice.startMinutes)}, but that time is not currently protected by an active schedule hold. Use Change time/Move or re-approve after choosing the correct time.`;
+      })
+      .filter(Boolean);
+  }, [registrationRequests, scheduleHolds]);
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -656,6 +735,18 @@ export default function Home() {
       return;
     }
 
+    const { error: cleanupHoldError } = await supabase
+      .from("schedule_holds")
+      .update({ active: false, status: "moved" })
+      .eq("request_id", item.id)
+      .neq("id", saveResult.data.id);
+
+    if (cleanupHoldError) {
+      setAdminMessage(`Lesson time moved, but older duplicate holds could not be cleaned up: ${cleanupHoldError.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
     const { error: requestError } = await supabase
       .from("registration_requests")
       .update({ first_choice: nextChoice })
@@ -735,7 +826,20 @@ export default function Home() {
       };
     }
 
-    return { ok: true };
+    const { error: cleanupHoldError } = await supabase
+      .from("schedule_holds")
+      .update({ active: false, status: "moved" })
+      .eq("request_id", item.id)
+      .neq("id", saveResult.data.id);
+
+    if (cleanupHoldError) {
+      return {
+        ok: false,
+        message: `The schedule hold was saved, but older duplicate holds could not be cleaned up: ${cleanupHoldError.message}`
+      };
+    }
+
+    return { ok: true, holdId: saveResult.data.id };
   }
 
   async function loadScheduleRules() {
@@ -1104,6 +1208,7 @@ export default function Home() {
     setAdminLoading(true);
     setAdminMessage("Updating request...");
 
+    let activeHoldId = null;
     if (item.table === "registration_requests") {
       const holdResult = await ensureRequestScheduleHold(item, nextStatus);
       if (!holdResult.ok) {
@@ -1111,6 +1216,7 @@ export default function Home() {
         setAdminLoading(false);
         return;
       }
+      activeHoldId = holdResult.holdId || null;
     }
 
     const { error } = await supabase
@@ -1126,10 +1232,13 @@ export default function Home() {
 
     if (item.table === "registration_requests") {
       const holdActive = ["pending", "approved"].includes(nextStatus);
-      const { error: holdError } = await supabase
+      const holdUpdate = supabase
         .from("schedule_holds")
         .update({ status: nextStatus, active: holdActive })
         .eq("request_id", item.id);
+      const { error: holdError } = activeHoldId && holdActive
+        ? await holdUpdate.eq("id", activeHoldId)
+        : await holdUpdate;
 
       if (holdError) {
         setAdminMessage(`Request status changed, but the schedule hold could not be updated: ${holdError.message}`);
@@ -1687,6 +1796,33 @@ export default function Home() {
                     </button>
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
+                  {(scheduleConflictGroups.length > 0 || scheduleHealthIssues.length > 0) && (
+                    <section className="conflict-alert" aria-live="polite">
+                      <div>
+                        <p className="eyebrow">Schedule needs attention</p>
+                        <h3>Review schedule conflicts and hold issues</h3>
+                        <p>Fix these before treating the schedule as final. Holds are what prevent another family from taking the same time.</p>
+                      </div>
+                      <div className="conflict-list">
+                        {scheduleConflictGroups.map((group) => (
+                          <article key={group.title}>
+                            <strong>{group.title}</strong>
+                            {group.conflicts.map((conflict) => (
+                              <span key={conflict}>{conflict}</span>
+                            ))}
+                          </article>
+                        ))}
+                        {scheduleHealthIssues.length > 0 && (
+                          <article>
+                            <strong>Missing or mismatched active holds</strong>
+                            {scheduleHealthIssues.map((issue) => (
+                              <span key={issue}>{issue}</span>
+                            ))}
+                          </article>
+                        )}
+                      </div>
+                    </section>
+                  )}
                   <section className="schedule-activity">
                     <div className="section-heading compact-heading">
                       <p className="eyebrow">Schedule activity</p>

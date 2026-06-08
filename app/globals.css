@@ -658,6 +658,45 @@ textarea {
   color: var(--ink);
 }
 
+.conflict-alert {
+  background: #fff8ef;
+  border: 1px solid #e4b98c;
+  border-radius: 8px;
+  color: #7a461d;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 16px;
+}
+
+.conflict-alert h3,
+.conflict-alert p {
+  margin: 0;
+}
+
+.conflict-alert .eyebrow {
+  color: #9a4f22;
+  margin-bottom: 6px;
+}
+
+.conflict-list {
+  display: grid;
+  gap: 10px;
+}
+
+.conflict-list article {
+  background: white;
+  border: 1px solid #efd1b3;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.conflict-list span {
+  line-height: 1.45;
+}
+
 .compact-heading {
   margin-bottom: 16px;
 }
