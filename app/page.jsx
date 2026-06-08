@@ -272,6 +272,7 @@ export default function Home() {
             name: item.student_name,
             details: `${item.parent_name} was moved from registration requests to the waitlist.`,
             choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
+            firstChoice: item.first_choice,
             email: item.email,
             parentName: item.parent_name,
             lessonLength: item.lesson_length,
@@ -337,6 +338,7 @@ export default function Home() {
         name: item.student_name,
         details: `${item.family_type === "returning" ? "Returning" : "New"} student requesting ${item.location}, ${item.lesson_length} minutes.`,
         choices: [item.first_choice, item.second_choice, item.third_choice].filter(Boolean).join(" | ") || "No choices selected.",
+        firstChoice: item.first_choice,
         email: item.email,
         parentName: item.parent_name,
         lessonLength: item.lesson_length,
@@ -638,6 +640,72 @@ export default function Home() {
     setMoveSelections((current) => ({ ...current, [item.id]: "" }));
     await loadAdminData();
     setAdminMessage("Lesson time moved.");
+  }
+
+  async function ensureRequestScheduleHold(item, nextStatus) {
+    if (!["pending", "approved"].includes(nextStatus)) {
+      return { ok: true };
+    }
+
+    const parsedChoice = parseSlotLabel(item.firstChoice || "");
+    if (!parsedChoice) {
+      return {
+        ok: false,
+        message: "This request cannot be approved until it has a valid first-choice lesson time."
+      };
+    }
+
+    const holdPayload = {
+      request_id: item.id,
+      term: item.term,
+      location: item.location,
+      day_of_week: parsedChoice.day,
+      start_minutes: parsedChoice.startMinutes,
+      end_minutes: parsedChoice.endMinutes,
+      status: nextStatus,
+      active: true
+    };
+
+    const { data: existingHold, error: existingHoldError } = await supabase
+      .from("schedule_holds")
+      .select("id")
+      .eq("request_id", item.id)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (existingHoldError) {
+      return {
+        ok: false,
+        message: `The existing schedule hold could not be checked: ${existingHoldError.message}`
+      };
+    }
+
+    const saveResult = existingHold
+      ? await supabase
+        .from("schedule_holds")
+        .update(holdPayload)
+        .eq("id", existingHold.id)
+        .select("id")
+        .maybeSingle()
+      : await supabase
+        .from("schedule_holds")
+        .insert(holdPayload)
+        .select("id")
+        .maybeSingle();
+
+    if (saveResult.error || !saveResult.data) {
+      const rawMessage = saveResult.error?.message || "";
+      const needsPolicyUpdate = rawMessage.toLowerCase().includes("row-level security");
+
+      return {
+        ok: false,
+        message: needsPolicyUpdate
+          ? "Supabase needs the latest schedule-hold SQL before approval can repair missing holds. Run the SQL I provide, then try approving again."
+          : `That time cannot be approved because it overlaps another active hold. Choose a different time first. ${rawMessage}`.trim()
+      };
+    }
+
+    return { ok: true };
   }
 
   async function loadScheduleRules() {
@@ -1005,6 +1073,15 @@ export default function Home() {
     if (!supabase) return;
     setAdminLoading(true);
     setAdminMessage("Updating request...");
+
+    if (item.table === "registration_requests") {
+      const holdResult = await ensureRequestScheduleHold(item, nextStatus);
+      if (!holdResult.ok) {
+        setAdminMessage(holdResult.message);
+        setAdminLoading(false);
+        return;
+      }
+    }
 
     const { error } = await supabase
       .from(item.table)

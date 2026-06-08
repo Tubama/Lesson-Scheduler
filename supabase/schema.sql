@@ -102,6 +102,31 @@ begin
 end;
 $$;
 
+with duplicate_active_holds as (
+  select
+    id,
+    row_number() over (
+      partition by request_id
+      order by created_at desc, id desc
+    ) as active_rank
+  from public.schedule_holds
+  where active = true
+    and request_id is not null
+)
+update public.schedule_holds
+set active = false,
+    status = 'moved'
+where id in (
+  select id
+  from duplicate_active_holds
+  where active_rank > 1
+);
+
+create unique index if not exists schedule_holds_one_active_per_request
+on public.schedule_holds (request_id)
+where active = true
+  and request_id is not null;
+
 insert into public.studio_admins (email)
 values ('moorejacob22@yahoo.com')
 on conflict (email) do nothing;
@@ -310,6 +335,19 @@ with check (
   active = true
   and status = 'pending'
   and start_minutes < end_minutes
+);
+
+drop policy if exists "Studio admins can create schedule holds" on public.schedule_holds;
+create policy "Studio admins can create schedule holds"
+on public.schedule_holds
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from public.studio_admins
+    where studio_admins.email = auth.jwt() ->> 'email'
+  )
 );
 
 drop policy if exists "Studio admins can read all schedule rules" on public.schedule_rules;
