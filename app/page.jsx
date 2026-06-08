@@ -386,11 +386,14 @@ export default function Home() {
 
         return {
           id: request.id,
+          table: "registration_requests",
+          status: request.status,
           term: request.term,
           location: request.location,
           day: parsedChoice.day,
           startMinutes: parsedChoice.startMinutes,
           time: formatTime(parsedChoice.startMinutes),
+          name: request.student_name,
           studentName: request.student_name,
           parentName: request.parent_name,
           email: request.email,
@@ -604,23 +607,50 @@ export default function Home() {
     setAdminMessage("Moving lesson time...");
 
     const holdActive = ["pending", "approved"].includes(item.status);
-    const { data: movedHold, error: holdError } = await supabase
-      .from("schedule_holds")
-      .update({
-        day_of_week: parsedChoice.day,
-        start_minutes: parsedChoice.startMinutes,
-        end_minutes: parsedChoice.endMinutes,
-        status: item.status,
-        active: holdActive
-      })
-      .eq("request_id", item.id)
-      .select("id")
-      .maybeSingle();
+    const holdPayload = {
+      request_id: item.id,
+      term: item.term,
+      location: item.location,
+      day_of_week: parsedChoice.day,
+      start_minutes: parsedChoice.startMinutes,
+      end_minutes: parsedChoice.endMinutes,
+      status: item.status,
+      active: holdActive
+    };
 
-    if (holdError || !movedHold) {
-      setAdminMessage(holdError
-        ? `The schedule hold could not be moved: ${holdError.message}`
-        : "No matching schedule hold was found to move."
+    const { data: existingHolds, error: existingHoldError } = await supabase
+      .from("schedule_holds")
+      .select("id")
+      .eq("request_id", item.id)
+      .eq("active", true)
+      .limit(1);
+
+    if (existingHoldError) {
+      setAdminMessage(`The existing schedule hold could not be checked: ${existingHoldError.message}`);
+      setAdminLoading(false);
+      return;
+    }
+
+    const saveResult = existingHolds?.length
+      ? await supabase
+        .from("schedule_holds")
+        .update(holdPayload)
+        .eq("id", existingHolds[0].id)
+        .select("id")
+        .maybeSingle()
+      : await supabase
+        .from("schedule_holds")
+        .insert(holdPayload)
+        .select("id")
+        .maybeSingle();
+
+    if (saveResult.error || !saveResult.data) {
+      const rawMessage = saveResult.error?.message || "";
+      const needsPolicyUpdate = rawMessage.toLowerCase().includes("row-level security");
+
+      setAdminMessage(needsPolicyUpdate
+        ? "Supabase needs the latest schedule-hold SQL before approved times can be moved. Run the SQL I provided, then try moving again."
+        : `That time cannot be used because it overlaps another active hold. Choose a different time. ${rawMessage}`.trim()
       );
       setAdminLoading(false);
       return;
@@ -1723,6 +1753,25 @@ export default function Home() {
                                   <strong>{row.time}</strong>
                                   <span>{row.studentName}</span>
                                   <small>{row.lessonLength} minutes · {row.parentName} · {row.email}</small>
+                                  <div className="approved-move">
+                                    <select
+                                      value={moveSelections[row.id] || ""}
+                                      onChange={(event) => setMoveSelections((current) => ({ ...current, [row.id]: event.target.value }))}
+                                    >
+                                      <option value="">Change time</option>
+                                      {moveOptionsFor(row).map((slot) => {
+                                        const label = slotLabel(slot);
+                                        return (
+                                          <option key={`${row.id}-${label}`} value={label}>
+                                            {label}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                    <button className="button secondary" type="button" onClick={() => moveRequestTime(row)}>
+                                      Move
+                                    </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
