@@ -61,6 +61,7 @@ http://localhost:3000
 ## Supabase setup
 
 Run `supabase/schema.sql` in the Supabase SQL editor before testing real form submissions.
+Run it again whenever schedule-hold policies or indexes change; admin approval and move actions depend on the latest `schedule_holds` policies.
 
 The schema adds:
 
@@ -72,7 +73,7 @@ The schema adds:
 - Row level security policies for public inserts
 - Public schedule-rule reads
 - Public privacy-safe hold reads
-- Authenticated admin read/update policies
+- Authenticated admin read/update/create policies for schedule management
 
 The starter admin email is `moorejacob22@yahoo.com`. Create a Supabase Auth user with that email, or update `studio_admins` to match the email you want to use for admin login.
 

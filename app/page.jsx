@@ -696,12 +696,12 @@ export default function Home() {
       active: true
     };
 
-    const { data: existingHold, error: existingHoldError } = await supabase
+    const { data: existingHolds, error: existingHoldError } = await supabase
       .from("schedule_holds")
       .select("id")
       .eq("request_id", item.id)
       .eq("active", true)
-      .maybeSingle();
+      .limit(1);
 
     if (existingHoldError) {
       return {
@@ -710,11 +710,11 @@ export default function Home() {
       };
     }
 
-    const saveResult = existingHold
+    const saveResult = existingHolds?.length
       ? await supabase
         .from("schedule_holds")
         .update(holdPayload)
-        .eq("id", existingHold.id)
+        .eq("id", existingHolds[0].id)
         .select("id")
         .maybeSingle()
       : await supabase
