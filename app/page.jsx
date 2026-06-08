@@ -237,6 +237,7 @@ export default function Home() {
   const [adminSettings, setAdminSettings] = useState(initialAdminSettings);
   const [registrationOpen, setRegistrationOpen] = useState(true);
   const [adminSearch, setAdminSearch] = useState("");
+  const [movePickerDays, setMovePickerDays] = useState({});
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
@@ -669,6 +670,93 @@ export default function Home() {
     const holdsWithoutCurrentRequest = scheduleHolds.filter((hold) => hold.request_id !== item.id);
     return generateSlots(scheduleRules, holdsWithoutCurrentRequest, item.term, item.location, Number(item.lessonLength))
       .filter((slot) => slot.status === "open");
+  }
+
+  function moveOptionGroupsFor(item) {
+    const options = moveOptionsFor(item);
+    return weekdays
+      .map((day) => ({
+        day,
+        slots: options.filter((slot) => slot.day === day)
+      }))
+      .filter((group) => group.slots.length > 0);
+  }
+
+  function selectMovePickerDay(itemId, day) {
+    setMovePickerDays((current) => ({ ...current, [itemId]: day }));
+    setMoveSelections((current) => {
+      const currentChoice = current[itemId];
+      const parsedChoice = currentChoice ? parseSlotLabel(currentChoice) : null;
+      if (!parsedChoice || parsedChoice.day === day) return current;
+      return { ...current, [itemId]: "" };
+    });
+  }
+
+  function selectMovePickerTime(itemId, label) {
+    const parsedChoice = parseSlotLabel(label);
+    if (parsedChoice) {
+      setMovePickerDays((current) => ({ ...current, [itemId]: parsedChoice.day }));
+    }
+    setMoveSelections((current) => ({ ...current, [itemId]: label }));
+  }
+
+  function renderMovePicker(item, compact = false) {
+    const groups = moveOptionGroupsFor(item);
+    const selectedChoice = moveSelections[item.id] || "";
+    const selectedParsed = selectedChoice ? parseSlotLabel(selectedChoice) : null;
+    const activeDay = movePickerDays[item.id] || selectedParsed?.day || groups[0]?.day || "";
+    const activeGroup = groups.find((group) => group.day === activeDay) || groups[0];
+
+    return (
+      <div className={`move-picker ${compact ? "compact" : ""}`}>
+        {groups.length ? (
+          <>
+            <div className="move-day-list" aria-label={`Move ${item.name || item.studentName} day`}>
+              {groups.map((group) => (
+                <button
+                  className={`move-day-button ${activeGroup?.day === group.day ? "active" : ""}`}
+                  key={`${item.id}-${group.day}`}
+                  onClick={() => selectMovePickerDay(item.id, group.day)}
+                  type="button"
+                >
+                  <span>{group.day}</span>
+                  <small>{group.slots.length} open</small>
+                </button>
+              ))}
+            </div>
+            <div className="move-time-panel">
+              <div className="move-time-heading">
+                <strong>{activeGroup?.day || "Available times"}</strong>
+                <span>{selectedChoice || "Choose a time"}</span>
+              </div>
+              <div className="move-time-grid" aria-label={`Available ${activeGroup?.day || ""} move times`}>
+                {activeGroup?.slots.map((slot) => {
+                  const label = slotLabel(slot);
+                  return (
+                    <button
+                      className={`move-time-button ${selectedChoice === label ? "selected" : ""}`}
+                      key={`${item.id}-${label}`}
+                      onClick={() => selectMovePickerTime(item.id, label)}
+                      type="button"
+                    >
+                      {slot.start}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state compact-empty">
+            <strong>No open move times.</strong>
+            <span>Change this student's lesson length or teaching blocks if more openings should appear.</span>
+          </div>
+        )}
+        <button className="button secondary" disabled={!selectedChoice} type="button" onClick={() => moveRequestTime(item)}>
+          Move
+        </button>
+      </div>
+    );
   }
 
   async function moveRequestTime(item) {
@@ -1889,25 +1977,7 @@ export default function Home() {
                                   <strong>{row.time}</strong>
                                   <span>{row.studentName}</span>
                                   <small>{row.lessonLength} minutes · {row.parentName} · {row.email}</small>
-                                  <div className="approved-move">
-                                    <select
-                                      value={moveSelections[row.id] || ""}
-                                      onChange={(event) => setMoveSelections((current) => ({ ...current, [row.id]: event.target.value }))}
-                                    >
-                                      <option value="">Change time</option>
-                                      {moveOptionsFor(row).map((slot) => {
-                                        const label = slotLabel(slot);
-                                        return (
-                                          <option key={`${row.id}-${label}`} value={label}>
-                                            {label}
-                                          </option>
-                                        );
-                                      })}
-                                    </select>
-                                    <button className="button secondary" type="button" onClick={() => moveRequestTime(row)}>
-                                      Move
-                                    </button>
-                                  </div>
+                                  {renderMovePicker(row, true)}
                                 </div>
                               ))}
                             </div>
@@ -1924,8 +1994,6 @@ export default function Home() {
                   <div className="admin-list">
                     {visibleAdminCards.length ? (
                       visibleAdminCards.map((item) => {
-                        const moveOptions = moveOptionsFor(item);
-
                         return (
                           <article className="admin-card" key={`${item.table}-${item.id}`}>
                             <span className={`status-pill status-${item.status}`}>{item.status}</span>
@@ -1942,26 +2010,7 @@ export default function Home() {
                             {item.notes && <p>Notes: {item.notes}</p>}
                             {item.table === "registration_requests" && ["pending", "approved"].includes(item.status) && (
                               <div className="move-tool">
-                                <label>
-                                  Move to generated time
-                                  <select
-                                    value={moveSelections[item.id] || ""}
-                                    onChange={(event) => setMoveSelections((current) => ({ ...current, [item.id]: event.target.value }))}
-                                  >
-                                    <option value="">Choose a new time</option>
-                                    {moveOptions.map((slot) => {
-                                      const label = slotLabel(slot);
-                                      return (
-                                        <option key={`${item.id}-${label}`} value={label}>
-                                          {label}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                </label>
-                                <button className="button secondary" type="button" onClick={() => moveRequestTime(item)}>
-                                  Move
-                                </button>
+                                {renderMovePicker(item)}
                               </div>
                             )}
                             <div className="admin-card-actions">

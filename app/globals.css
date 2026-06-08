@@ -826,17 +826,6 @@ textarea {
   line-height: 1.45;
 }
 
-.approved-move {
-  align-items: center;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(150px, 1fr) auto;
-}
-
-.approved-move select {
-  min-height: 38px;
-}
-
 .schedule-rule-form {
   display: grid;
   gap: 12px;
@@ -937,17 +926,116 @@ textarea {
 }
 
 .move-tool {
-  align-items: end;
   border-top: 1px solid var(--line);
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
   margin-top: 14px;
   padding-top: 14px;
 }
 
-.move-tool label {
+.move-picker {
+  align-items: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(240px, 1.3fr) auto;
+}
+
+.move-picker.compact {
+  grid-template-columns: minmax(110px, 0.65fr) minmax(210px, 1.35fr) auto;
+}
+
+.move-day-list {
+  display: grid;
   gap: 6px;
+}
+
+.move-day-button,
+.move-time-button {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.move-day-button {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.move-day-button span {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.move-day-button small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.move-day-button.active,
+.move-time-button.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.move-day-button.active span,
+.move-day-button.active small {
+  color: white;
+}
+
+.move-time-panel {
+  background: var(--soft-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.move-time-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.move-time-heading strong {
+  color: var(--ink);
+}
+
+.move-time-heading span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.move-time-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+}
+
+.move-time-button {
+  min-height: 34px;
+  padding: 7px 8px;
+}
+
+.move-picker > .button {
+  align-self: end;
+  min-height: 38px;
+}
+
+.compact-empty {
+  margin: 0;
 }
 
 .status-pill {
@@ -1040,6 +1128,15 @@ textarea {
     align-items: start;
     grid-template-columns: 1fr;
   }
+
+  .move-picker,
+  .move-picker.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .move-picker > .button {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1066,5 +1163,13 @@ textarea {
 
   .schedule-rule-form {
     grid-template-columns: 1fr;
+  }
+
+  .move-time-heading {
+    display: grid;
+  }
+
+  .move-time-heading span {
+    text-align: left;
   }
 }
