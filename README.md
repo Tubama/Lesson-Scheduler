@@ -19,6 +19,7 @@ A prototype web app for yearly and summer music lesson placement.
 - Admin search across student, parent, email, notes, and request details
 - Admin tab counts for pending, approved, trial, and waitlist requests
 - Submitted timestamps on admin request cards
+- Admin schedule activity board for approved, pending, trial, and waitlist students
 - Approved schedule summary grouped by term, location, day, and time
 - CSV export for approved recurring placements
 - CSV export for visible admin request lists

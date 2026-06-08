@@ -425,6 +425,81 @@ export default function Home() {
     }, []);
   }, [approvedScheduleRows]);
 
+  const scheduleActivityRows = useMemo(() => {
+    const registrationRows = registrationRequests
+      .filter((request) => ["approved", "pending", "waitlist"].includes(request.status))
+      .map((request) => {
+        const parsedChoice = parseSlotLabel(request.first_choice || "");
+
+        return {
+          id: `registration-${request.id}`,
+          status: request.status,
+          placement: parsedChoice ? "scheduled" : "unscheduled",
+          term: request.term || "school",
+          location: request.location || "No location",
+          day: parsedChoice?.day || "Unscheduled",
+          startMinutes: parsedChoice?.startMinutes ?? 99999,
+          time: parsedChoice ? formatTime(parsedChoice.startMinutes) : "No time selected",
+          studentName: request.student_name,
+          parentName: request.parent_name,
+          email: request.email,
+          lessonLength: request.lesson_length,
+          notes: request.notes,
+          sortStatus: request.status
+        };
+      });
+
+    const waitlistRows = waitlistEntries
+      .filter((entry) => ["waiting", "invited", "trial"].includes(entry.status))
+      .map((entry) => ({
+        id: `waitlist-${entry.id}`,
+        status: entry.status === "waiting" ? "waitlist" : entry.status,
+        placement: "unscheduled",
+        term: "waitlist",
+        location: entry.location || "No location",
+        day: "Waitlist / trials",
+        startMinutes: 99999,
+        time: entry.status === "trial" ? "Trial candidate" : "Waiting",
+        studentName: entry.student_name,
+        parentName: entry.parent_name,
+        email: entry.email,
+        lessonLength: entry.lesson_length,
+        notes: entry.notes,
+        sortStatus: entry.status
+      }));
+
+    return [...registrationRows, ...waitlistRows].sort((a, b) => {
+      if (a.placement !== b.placement) return a.placement === "scheduled" ? -1 : 1;
+      const termCompare = a.term.localeCompare(b.term);
+      if (termCompare) return termCompare;
+      const locationCompare = a.location.localeCompare(b.location);
+      if (locationCompare) return locationCompare;
+      const dayCompare = (weekdays.indexOf(a.day) === -1 ? 99 : weekdays.indexOf(a.day)) - (weekdays.indexOf(b.day) === -1 ? 99 : weekdays.indexOf(b.day));
+      if (dayCompare) return dayCompare;
+      const timeCompare = a.startMinutes - b.startMinutes;
+      if (timeCompare) return timeCompare;
+      const statusCompare = a.sortStatus.localeCompare(b.sortStatus);
+      if (statusCompare) return statusCompare;
+      return a.studentName.localeCompare(b.studentName);
+    });
+  }, [registrationRequests, waitlistEntries]);
+
+  const scheduleActivityGroups = useMemo(() => {
+    return scheduleActivityRows.reduce((groups, row) => {
+      const title = row.placement === "scheduled"
+        ? `${row.term === "summer" ? "Summer" : "School year"} · ${row.location} · ${row.day}`
+        : `${row.status === "trial" ? "Trials" : "Waitlist"} · ${row.location}`;
+      const existingGroup = groups.find((group) => group.title === title);
+
+      if (existingGroup) {
+        existingGroup.rows.push(row);
+        return groups;
+      }
+
+      return [...groups, { title, rows: [row] }];
+    }, []);
+  }, [scheduleActivityRows]);
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -1505,6 +1580,45 @@ export default function Home() {
                     </button>
                   </div>
                   {adminMessage && <p className="admin-message">{adminMessage}</p>}
+                  <section className="schedule-activity">
+                    <div className="section-heading compact-heading">
+                      <p className="eyebrow">Schedule activity</p>
+                      <h3>All approved, pending, trial, and waitlist students</h3>
+                      <p>Scheduled rows are grouped by term, location, day, and start time. Waitlist and trial students appear below by location until they have a recurring placement.</p>
+                    </div>
+                    <div className="activity-legend">
+                      {["approved", "pending", "trial", "waitlist"].map((status) => (
+                        <span className={`status-pill status-${status}`} key={status}>{status}</span>
+                      ))}
+                    </div>
+                    {scheduleActivityGroups.length ? (
+                      <div className="activity-groups">
+                        {scheduleActivityGroups.map((group) => (
+                          <article className="activity-group" key={group.title}>
+                            <h4>{group.title}</h4>
+                            <div className="activity-row-list">
+                              {group.rows.map((row) => (
+                                <div className="activity-row" key={row.id}>
+                                  <strong>{row.time}</strong>
+                                  <span className={`status-pill status-${row.status}`}>{row.status}</span>
+                                  <div>
+                                    <b>{row.studentName}</b>
+                                    <small>{row.lessonLength} minutes · {row.parentName} · {row.email}</small>
+                                    {row.notes && <small>Notes: {row.notes}</small>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <strong>No schedule activity yet.</strong>
+                        <span>Pending, approved, trial, and waitlist students will appear here after requests are submitted.</span>
+                      </div>
+                    )}
+                  </section>
                   <section className="approved-schedule">
                     <div className="schedule-summary-heading">
                       <div className="section-heading compact-heading">
