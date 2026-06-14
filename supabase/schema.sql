@@ -139,6 +139,10 @@ insert into public.app_settings (key, value)
 values ('registration_open', 'true')
 on conflict (key) do nothing;
 
+insert into public.app_settings (key, value)
+values ('active_registration_term', 'school')
+on conflict (key) do nothing;
+
 create or replace function public.validate_returning_access_code(submitted_code text)
 returns boolean
 language plpgsql
@@ -178,6 +182,30 @@ end;
 $$;
 
 grant execute on function public.is_registration_open() to anon, authenticated;
+
+create or replace function public.get_active_registration_term()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored_term text;
+begin
+  select value
+  into stored_term
+  from public.app_settings
+  where key = 'active_registration_term';
+
+  if stored_term in ('school', 'summer') then
+    return stored_term;
+  end if;
+
+  return 'school';
+end;
+$$;
+
+grant execute on function public.get_active_registration_term() to anon, authenticated;
 
 create or replace function public.has_active_student_request(
   submitted_email text,

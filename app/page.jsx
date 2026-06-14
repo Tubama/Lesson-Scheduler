@@ -66,7 +66,22 @@ const initialScheduleRule = {
 
 const initialAdminSettings = {
   returningAccessCode: fallbackReturningAccessCode,
-  registrationOpen: true
+  activeRegistrationTerm: "school"
+};
+
+const seasonMeta = {
+  school: {
+    eyebrow: "School year lesson placement",
+    title: "Request your recurring lesson time.",
+    registrationLabel: "2026-2027 school year registration",
+    adminLabel: "School year 2026-2027"
+  },
+  summer: {
+    eyebrow: "Summer lesson placement",
+    title: "Request your summer recurring lesson time.",
+    registrationLabel: "Summer lesson block registration",
+    adminLabel: "Summer lesson block"
+  }
 };
 
 function minutesFromTime(time) {
@@ -257,10 +272,10 @@ export default function Home() {
   const [scheduleMessage, setScheduleMessage] = useState("");
   const [moveSelections, setMoveSelections] = useState({});
   const [adminSettings, setAdminSettings] = useState(initialAdminSettings);
-  const [registrationOpen, setRegistrationOpen] = useState(true);
   const [adminSearch, setAdminSearch] = useState("");
   const [movePickerDays, setMovePickerDays] = useState({});
-  const [registrationPreviewMode, setRegistrationPreviewMode] = useState("option1");
+  const [activeRegistrationTerm, setActiveRegistrationTerm] = useState("school");
+  const registrationPreviewMode = "option2";
 
   const filteredSlots = useMemo(() => {
     return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength), registrationPreviewMode);
@@ -279,10 +294,8 @@ export default function Home() {
   const selectedDaySlots = selectedDay
     ? filteredSlots.filter((slot) => slot.day === selectedDay)
     : slotsByDay[0]?.slots || [];
-  const allSlots = generateSlots(scheduleRules, scheduleHolds, form.term, null, Number(form.lessonLength), registrationPreviewMode);
-  const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
-  const pendingCount = registrationRequests.filter((request) => request.status === "pending").length;
   const isNewFamily = form.familyType === "new";
+  const hasAllPreferredChoices = isNewFamily || Boolean(form.firstChoice && form.secondChoice && form.thirdChoice);
   const adminCards = useMemo(() => {
     if (adminFilter === "waitlist") {
       return [
@@ -613,7 +626,7 @@ export default function Home() {
 
     loadScheduleRules();
     loadScheduleHolds();
-    loadRegistrationStatus();
+    loadPublicRegistrationTerm();
 
     supabase.auth.getSession().then(({ data }) => {
       setAdminSession(data.session);
@@ -642,6 +655,18 @@ export default function Home() {
       setSelectedDay(slotsByDay[0].day);
     }
   }, [slotsByDay, selectedDay]);
+
+  useEffect(() => {
+    setForm((current) => current.term === activeRegistrationTerm
+      ? current
+      : {
+          ...current,
+          term: activeRegistrationTerm,
+          firstChoice: "",
+          secondChoice: "",
+          thirdChoice: ""
+        });
+  }, [activeRegistrationTerm]);
 
   function updateForm(event) {
     const { checked, name, type, value } = event.target;
@@ -990,13 +1015,13 @@ export default function Home() {
     setScheduleHolds(data || []);
   }
 
-  async function loadRegistrationStatus() {
+  async function loadPublicRegistrationTerm() {
     if (!supabase) return;
 
-    const { data, error } = await supabase.rpc("is_registration_open");
+    const { data, error } = await supabase.rpc("get_active_registration_term");
 
-    if (!error) {
-      setRegistrationOpen(data !== false);
+    if (!error && ["school", "summer"].includes(data)) {
+      setActiveRegistrationTerm(data);
     }
   }
 
@@ -1006,7 +1031,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from("app_settings")
       .select("key, value")
-      .in("key", ["returning_access_code", "registration_open"]);
+      .in("key", ["returning_access_code", "active_registration_term"]);
 
     if (error) {
       setAdminMessage(`Could not load registration settings: ${error.message}`);
@@ -1014,13 +1039,13 @@ export default function Home() {
     }
 
     const settings = Object.fromEntries((data || []).map((item) => [item.key, item.value]));
-    const nextRegistrationOpen = settings.registration_open !== "false";
+    const nextActiveRegistrationTerm = settings.active_registration_term === "summer" ? "summer" : "school";
 
     setAdminSettings({
       returningAccessCode: settings.returning_access_code || fallbackReturningAccessCode,
-      registrationOpen: nextRegistrationOpen
+      activeRegistrationTerm: nextActiveRegistrationTerm
     });
-    setRegistrationOpen(nextRegistrationOpen);
+    setActiveRegistrationTerm(nextActiveRegistrationTerm);
   }
 
   async function validateReturningAccessCode() {
@@ -1035,17 +1060,6 @@ export default function Home() {
     }
 
     return data === true;
-  }
-
-  async function checkRegistrationOpen() {
-    if (!supabase) return true;
-
-    const { data, error } = await supabase.rpc("is_registration_open");
-
-    if (error) return registrationOpen;
-
-    setRegistrationOpen(data !== false);
-    return data !== false;
   }
 
   async function hasDuplicateRequest() {
@@ -1068,7 +1082,7 @@ export default function Home() {
     if (!supabase) return;
 
     const nextCode = adminSettings.returningAccessCode.trim();
-    const nextRegistrationOpen = Boolean(adminSettings.registrationOpen);
+    const nextActiveRegistrationTerm = adminSettings.activeRegistrationTerm === "summer" ? "summer" : "school";
 
     if (!nextCode) {
       setAdminMessage("Enter a returning-family access code before saving.");
@@ -1087,8 +1101,8 @@ export default function Home() {
           updated_at: new Date().toISOString()
         },
         {
-          key: "registration_open",
-          value: String(nextRegistrationOpen),
+          key: "active_registration_term",
+          value: nextActiveRegistrationTerm,
           updated_at: new Date().toISOString()
         }
       ]);
@@ -1099,7 +1113,7 @@ export default function Home() {
       return;
     }
 
-    setRegistrationOpen(nextRegistrationOpen);
+    setActiveRegistrationTerm(nextActiveRegistrationTerm);
     setAdminMessage("Registration settings saved.");
     setAdminLoading(false);
   }
@@ -1374,14 +1388,6 @@ export default function Home() {
       return;
     }
 
-    if (!(await checkRegistrationOpen())) {
-      setSubmitState({
-        status: "error",
-        message: "Registration is currently closed. Please contact the studio if you need help."
-      });
-      return;
-    }
-
     if (!isNewFamily && !(await validateReturningAccessCode())) {
       setSubmitState({
         status: "error",
@@ -1394,6 +1400,14 @@ export default function Home() {
       setSubmitState({
         status: "error",
         message: "Please choose at least a first-choice lesson time."
+      });
+      return;
+    }
+
+    if (!isNewFamily && !(form.firstChoice && form.secondChoice && form.thirdChoice)) {
+      setSubmitState({
+        status: "error",
+        message: "Please choose all 3 preferred lesson times before submitting."
       });
       return;
     }
@@ -1510,7 +1524,6 @@ export default function Home() {
           <div className="nav-actions" aria-label="Primary navigation">
             <a href="#register">Register</a>
             <a href="#waitlist">Waitlist</a>
-            <a href="#admin">Admin Preview</a>
           </div>
         </nav>
       </header>
@@ -1518,41 +1531,22 @@ export default function Home() {
       <main id="top">
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">School year and summer lesson placement</p>
-            <h1>Request your recurring lesson time for the season.</h1>
+            <p className="eyebrow">{seasonMeta[activeRegistrationTerm].eyebrow}</p>
+            <h1>{seasonMeta[activeRegistrationTerm].title}</h1>
             <p>
-              Returning families request their preferred studio time first. New students join
-              the waitlist and are invited into a 4-lesson trial only when a regular spot opens.
+              Returning students request three preferred lesson times. New students join the
+              waitlist and are invited into a 4-lesson trial only when a regular spot opens.
             </p>
             <div className="hero-actions">
               <a className="button primary" href="#register">Start registration</a>
-              <a className="button secondary" href="#admin">Review admin flow</a>
             </div>
           </div>
           <div className="hero-panel" aria-label="Schedule snapshot">
             <div className="panel-header">
-              <span>2026-2027 School Year</span>
-              <strong>Registration: returning families</strong>
+              <span>{seasonMeta[activeRegistrationTerm].adminLabel}</span>
+              <strong>Current registration season</strong>
             </div>
-            <div className="stat-grid">
-              <div>
-                <strong>{openSlotsCount}</strong>
-                <span>open starts</span>
-              </div>
-              <div>
-                <strong>{pendingCount}</strong>
-                <span>pending</span>
-              </div>
-              <div>
-                <strong>2</strong>
-                <span>locations</span>
-              </div>
-            </div>
-            <ol className="flow-list">
-              <li>Parents submit first, second, and third start-time choices.</li>
-              <li>Start-time options adjust to the selected lesson length.</li>
-              <li>Approved placements sync to Google Calendar.</li>
-            </ol>
+            <p className="hero-panel-note">Choose student type, lesson length, location, and 3 preferred lesson times.</p>
           </div>
         </section>
 
@@ -1561,29 +1555,15 @@ export default function Home() {
             <p className="eyebrow">Parent registration</p>
             <h2>Request a recurring lesson time</h2>
             <p>
-              This form shows start-time options by location while preserving the
-              flexibility to rearrange requests before the final schedule is approved.
+              {seasonMeta[activeRegistrationTerm].registrationLabel}. Fill out the form, choose 3 preferred times, and submit.
             </p>
           </div>
 
           <div className="workspace-grid">
             <form className="scheduler-card" onSubmit={submitRequest}>
-              {!registrationOpen && (
-                <p className="submit-message error">
-                  Registration is currently closed. Please contact the studio if you need help.
-                </p>
-              )}
-
               <div className="field-row">
                 <label>
-                  Schedule
-                  <select name="term" value={form.term} onChange={updateForm}>
-                    <option value="school">School year 2026-2027</option>
-                    <option value="summer">Summer lesson block</option>
-                  </select>
-                </label>
-                <label>
-                  Family type
+                  Student type
                   <select name="familyType" value={form.familyType} onChange={updateForm}>
                     <option value="returning">Returning student</option>
                     <option value="new">New student</option>
@@ -1665,20 +1645,7 @@ export default function Home() {
                     <div>
                       <p className="eyebrow">Preferred recurring times</p>
                       <h3>{form.location} {form.lessonLength}-minute starts</h3>
-                      <div className="time-preview-switcher" aria-label="Compare time list options">
-                        {Object.entries(registrationPreviewModes).map(([mode, config]) => (
-                          <button
-                            className={`preview-option-button ${registrationPreviewMode === mode ? "active" : ""}`}
-                            key={mode}
-                            onClick={() => setRegistrationPreviewMode(mode)}
-                            type="button"
-                          >
-                            <strong>{config.label}</strong>
-                            <span>{config.heading}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="preview-note">{registrationPreviewModes[registrationPreviewMode].description}</p>
+                      <p className="preview-note">{registrationPreviewModes.option2.description}</p>
                     </div>
                     <span>{openSlots.length} available</span>
                   </div>
@@ -1778,11 +1745,13 @@ export default function Home() {
               <div className="form-footer">
                 <p>
                   {isNewFamily
-                    ? "New families join the waitlist first. Trial lessons are offered only when a regular spot opens."
-                    : "Returning family requests are held as pending until teacher approval."}
+                    ? "New students join the waitlist first. Trial lessons are offered only when a regular spot opens."
+                    : hasAllPreferredChoices
+                      ? "All 3 preferred choices selected."
+                      : "Choose 3 preferred lesson times before submitting."}
                 </p>
-                <button className="button primary" type="submit" disabled={submitState.status === "saving" || !registrationOpen}>
-                  {submitState.status === "saving" ? "Saving..." : registrationOpen ? "Submit request" : "Registration closed"}
+                <button className="button primary" type="submit" disabled={submitState.status === "saving" || !hasAllPreferredChoices}>
+                  {submitState.status === "saving" ? "Saving..." : "Submit request"}
                 </button>
               </div>
               {submitState.message && (
@@ -1791,15 +1760,15 @@ export default function Home() {
             </form>
 
             <aside className="availability-card guidance-card">
-              <p className="eyebrow">How requests work</p>
-              <h3>Pick up to three options</h3>
+              <p className="eyebrow">Before you submit</p>
+              <h3>Choose 3 preferred times</h3>
               <p>
-                Choose the day first, then select your preferred start times. Your first choice is held while the request is pending.
+                Choose one day at a time, then tap three preferred starts that would work well for your family.
               </p>
               <div className="mini-rules">
-                <span>30, 45, or 60 minutes</span>
-                <span>Pending until approved</span>
-                <span>No overlapping holds</span>
+                <span>{seasonMeta[activeRegistrationTerm].adminLabel}</span>
+                <span>3 preferred choices required</span>
+                <span>Only open starts are shown</span>
               </div>
             </aside>
           </div>
@@ -1808,25 +1777,13 @@ export default function Home() {
         <section className="section muted" id="waitlist">
           <div className="section-heading">
             <p className="eyebrow">New students</p>
-            <h2>Waitlist and 4-lesson trial process</h2>
+            <h2>Waitlist and trial lessons</h2>
             <p>
-              New students do not see the regular schedule. They join the waitlist first.
-              When a student drops, the open weekly time can be offered as a 4-lesson trial.
+              New students do not choose from the regular schedule yet. They join the waitlist first, and a 4-lesson trial is offered when a regular weekly opening becomes available.
             </p>
           </div>
-          <div className="process-grid">
-            {[
-              ["Join waitlist", "Families share location, day, time, and lesson-length preferences."],
-              ["Spot opens", "You invite one waitlisted family when a weekly time becomes available."],
-              ["Trial block", "The family takes that same weekly time for 4 lessons."],
-              ["Continue or release", "You decide whether the student keeps the time or the slot reopens."]
-            ].map(([title, text], index) => (
-              <article key={title}>
-                <span>{index + 1}</span>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </article>
-            ))}
+          <div className="availability-card guidance-card">
+            <p>Waitlist requests still let you share lesson length, location, and any helpful notes about availability.</p>
           </div>
         </section>
 
@@ -1867,10 +1824,21 @@ export default function Home() {
                   <form className="admin-settings" onSubmit={saveAdminSettings}>
                     <div>
                       <p className="eyebrow">Registration settings</p>
-                      <h3>Returning-family access code</h3>
+                      <h3>Current registration season</h3>
                     </div>
                     <label>
-                      Current code
+                      Active registration season
+                      <select
+                        name="activeRegistrationTerm"
+                        onChange={updateAdminSettings}
+                        value={adminSettings.activeRegistrationTerm}
+                      >
+                        <option value="school">School year 2026-2027</option>
+                        <option value="summer">Summer lesson block</option>
+                      </select>
+                    </label>
+                    <label>
+                      Returning-family access code
                       <input
                         name="returningAccessCode"
                         onChange={updateAdminSettings}
@@ -1878,17 +1846,8 @@ export default function Home() {
                         value={adminSettings.returningAccessCode}
                       />
                     </label>
-                    <label className="settings-toggle">
-                      <input
-                        checked={adminSettings.registrationOpen}
-                        name="registrationOpen"
-                        onChange={updateAdminSettings}
-                        type="checkbox"
-                      />
-                      <span>Registration open</span>
-                    </label>
                     <button className="button secondary" disabled={adminLoading} type="submit">
-                      Save code
+                      Save settings
                     </button>
                   </form>
                   <div className="admin-toolbar">
