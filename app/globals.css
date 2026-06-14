@@ -403,6 +403,52 @@ textarea {
   font-weight: 800;
 }
 
+.time-preview-switcher {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.preview-option-button {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  min-height: 72px;
+  padding: 12px;
+  text-align: left;
+}
+
+.preview-option-button strong {
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.preview-option-button span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.preview-option-button.active {
+  background: var(--soft-2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(122, 154, 174, 0.14);
+}
+
+.preview-note {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 12px 0 0;
+  max-width: 66ch;
+}
+
 .day-grid {
   display: grid;
   gap: 10px;
@@ -1162,6 +1208,10 @@ textarea {
   }
 
   .schedule-rule-form {
+    grid-template-columns: 1fr;
+  }
+
+  .time-preview-switcher {
     grid-template-columns: 1fr;
   }
 

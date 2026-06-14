@@ -18,6 +18,18 @@ const defaultScheduleRules = [
 
 const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const slotStartIntervalMinutes = 15;
+const registrationPreviewModes = {
+  option1: {
+    label: "Option 1",
+    heading: "Flexible 15-minute starts",
+    description: "Shows every available 15-minute start so 30, 45, and 60 minute lessons can fit around each other with maximum flexibility."
+  },
+  option2: {
+    label: "Option 2",
+    heading: "Cleaner half-hour list",
+    description: "Keeps 45-minute lessons flexible, but simplifies 30 and 60 minute lessons to :00 and :30 starts so the list feels calmer."
+  }
+};
 
 const initialForm = {
   term: "school",
@@ -173,7 +185,17 @@ function overlaps(slot, hold) {
   );
 }
 
-function generateSlots(rules, holds, term, location, lessonLength) {
+function slotIntervalForMode(lessonLength, previewMode = "option1") {
+  if (previewMode === "option2" && lessonLength !== 45) {
+    return 30;
+  }
+
+  return slotStartIntervalMinutes;
+}
+
+function generateSlots(rules, holds, term, location, lessonLength, previewMode = "option1") {
+  const intervalMinutes = slotIntervalForMode(lessonLength, previewMode);
+
   return rules
     .filter((rule) => rule.active !== false && rule.term === term && (!location || rule.location === location))
     .flatMap((rule) => {
@@ -181,7 +203,7 @@ function generateSlots(rules, holds, term, location, lessonLength) {
       const end = minutesFromTime(rule.end_time);
       const slots = [];
 
-      for (let current = start; current + lessonLength <= end; current += slotStartIntervalMinutes) {
+      for (let current = start; current + lessonLength <= end; current += intervalMinutes) {
         slots.push({
           term,
           day: rule.day_of_week,
@@ -238,10 +260,11 @@ export default function Home() {
   const [registrationOpen, setRegistrationOpen] = useState(true);
   const [adminSearch, setAdminSearch] = useState("");
   const [movePickerDays, setMovePickerDays] = useState({});
+  const [registrationPreviewMode, setRegistrationPreviewMode] = useState("option1");
 
   const filteredSlots = useMemo(() => {
-    return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength));
-  }, [scheduleRules, scheduleHolds, form.term, form.location, form.lessonLength]);
+    return generateSlots(scheduleRules, scheduleHolds, form.term, form.location, Number(form.lessonLength), registrationPreviewMode);
+  }, [scheduleRules, scheduleHolds, form.term, form.location, form.lessonLength, registrationPreviewMode]);
 
   const openSlots = filteredSlots.filter((slot) => slot.status === "open");
   const slotsByDay = useMemo(() => {
@@ -256,7 +279,7 @@ export default function Home() {
   const selectedDaySlots = selectedDay
     ? filteredSlots.filter((slot) => slot.day === selectedDay)
     : slotsByDay[0]?.slots || [];
-  const allSlots = generateSlots(scheduleRules, scheduleHolds, form.term, null, Number(form.lessonLength));
+  const allSlots = generateSlots(scheduleRules, scheduleHolds, form.term, null, Number(form.lessonLength), registrationPreviewMode);
   const openSlotsCount = allSlots.filter((slot) => slot.status === "open").length;
   const pendingCount = registrationRequests.filter((request) => request.status === "pending").length;
   const isNewFamily = form.familyType === "new";
@@ -1642,6 +1665,20 @@ export default function Home() {
                     <div>
                       <p className="eyebrow">Preferred recurring times</p>
                       <h3>{form.location} {form.lessonLength}-minute starts</h3>
+                      <div className="time-preview-switcher" aria-label="Compare time list options">
+                        {Object.entries(registrationPreviewModes).map(([mode, config]) => (
+                          <button
+                            className={`preview-option-button ${registrationPreviewMode === mode ? "active" : ""}`}
+                            key={mode}
+                            onClick={() => setRegistrationPreviewMode(mode)}
+                            type="button"
+                          >
+                            <strong>{config.label}</strong>
+                            <span>{config.heading}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="preview-note">{registrationPreviewModes[registrationPreviewMode].description}</p>
                     </div>
                     <span>{openSlots.length} available</span>
                   </div>
